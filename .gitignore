@@ -1,6 +1,5 @@
 /.venv
 /.idea
 /__pycache__
-.pyc
 config.py
 bot.db
