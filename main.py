@@ -9,3 +9,5 @@ register_handlers(bot)
 print("TRYSTENDAI")
 
 bot.infinity_polling()
+
+print("Bot started polling")

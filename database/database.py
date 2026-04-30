@@ -8,8 +8,7 @@ cursor.execute("""
 CREATE TABLE IF NOT EXISTS users(
     user_id INTEGER PRIMARY KEY,
     vpn_id TEXT,
-    sub_until INTEGER
-)
+    sub_until INTEGER DEFAULT 0)
 """)
 conn.commit()
 
@@ -45,11 +44,12 @@ def get_subscription(user_id):
     if not row or not row[0]:
         return 0
 
-    return row[0]
+    return int(row[0])
 
 
 def has_sub(user_id):
-    return get_subscription(user_id) > int(time.time())
+    sub = int(get_subscription(user_id))
+    return sub > int(time.time())
 
 
 def save_vpn_id(user_id, vpn_id):
