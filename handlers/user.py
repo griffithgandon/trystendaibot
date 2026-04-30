@@ -63,13 +63,13 @@ def register_handlers(bot):
         for admin_id in ADMIN_ID:
             try:
                 bot.send_message(
-                    ADMIN_ID,
+                    admin_id,  # ← ВАЖНО: именно admin_id
                     f"Оплата от {call.from_user.id}",
                     reply_markup=markup
                 )
                 print(f"Отправлено админу {admin_id}")
             except Exception as e:
-                print(f"Не удалось отправить админу {admin_id}: {e}")
+                print(f"Не удалось отправить админу {admin_id}: {e}")   
 
     # ADMIN APPROVE
     @bot.callback_query_handler(func=lambda c: c.data.startswith("approve_"))

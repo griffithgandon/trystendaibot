@@ -68,13 +68,13 @@ def register_admin(bot):
         else:
             bot.send_message(call.message.chat.id, text)
 
-        bot.send_message(
+        msg = bot.send_message(
             call.message.chat.id,
             "\nОтправь ID пользователя для управления"
         )
 
         bot.register_next_step_handler(
-            call.message,
+            msg,
             user_manage
         )
 
