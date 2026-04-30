@@ -1,5 +1,5 @@
 from telebot import types
-
+from config import ADMIN_ID
 
 def main_menu():
     markup = types.InlineKeyboardMarkup()
@@ -16,5 +16,7 @@ def main_menu():
     markup.row(
         types.InlineKeyboardButton("📊 Проверить подписку", callback_data="check_sub")
     )
+
+    if
 
     return markup
