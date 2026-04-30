@@ -1,9 +1,0 @@
-BOT_TOKEN = "8016700212:AAEdNdq20KA0EZg8v8haXn2vYOtxFvYxL-I"
-
-ADMIN_ID = 1328828118
-
-# ===== 3x-ui =====
-PANEL_URL = "http://YOUR_IP:2053"
-USERNAME = "admin"
-PASSWORD = "password"
-INBOUND_ID = 1
