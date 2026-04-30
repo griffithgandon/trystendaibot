@@ -7,7 +7,7 @@ from config import ADMIN_ID
 
 def register_handlers(bot):
 
-    # ===== START =====
+    # START
     @bot.message_handler(commands=['start'])
     def start(message):
         add_user(message.from_user.id)
@@ -18,7 +18,7 @@ def register_handlers(bot):
             reply_markup=main_menu()
         )
 
-    # ===== PROFILE =====
+    # PROFILE
     @bot.callback_query_handler(func=lambda c: c.data == "profile")
     def profile(call):
 
@@ -26,15 +26,10 @@ def register_handlers(bot):
 
         bot.send_message(
             call.message.chat.id,
-            f"""
-👤 Профиль
-
-ID: {call.from_user.id}
-Подписка: {status}
-"""
+            f"""👤 Профиль\nID: {call.from_user.id}\nПодписка: {status}"""
         )
 
-    # ===== BUY =====
+    # BUY
     @bot.callback_query_handler(func=lambda c: c.data == "buy")
     def buy(call):
 
@@ -53,7 +48,7 @@ ID: {call.from_user.id}
             reply_markup=markup
         )
 
-    # ===== USER CLICK PAID =====
+    # USER CLICK PAID
     @bot.callback_query_handler(func=lambda c: c.data == "paid")
     def paid(call):
 
@@ -65,16 +60,18 @@ ID: {call.from_user.id}
                 callback_data=f"approve_{call.from_user.id}"
             )
         )
+        for admin_id in ADMIN_ID:
+            try:
+                bot.send_message(
+                    ADMIN_ID,
+                    f"Оплата от {call.from_user.id}",
+                    reply_markup=markup
+                )
+                print(f"Отправлено админу {admin_id}")
+            except Exception as e:
+                print(f"Не удалось отправить админу {admin_id}: {e}")
 
-        bot.send_message(
-            ADMIN_ID,
-            f"Оплата от {call.from_user.id}",
-            reply_markup=markup
-        )
-
-        bot.answer_callback_query(call.id, "Заявка отправлена")
-
-    # ===== ADMIN APPROVE =====
+    # ADMIN APPROVE
     @bot.callback_query_handler(func=lambda c: c.data.startswith("approve_"))
     def approve(call):
 
@@ -90,7 +87,7 @@ ID: {call.from_user.id}
 
         bot.answer_callback_query(call.id, "Готово")
 
-    # ===== TOKEN =====
+    # TOKEN
     @bot.callback_query_handler(func=lambda c: c.data == "token")
     def token(call):
 
@@ -107,7 +104,7 @@ ID: {call.from_user.id}
             f"🔑 Ваш VPN:\n{link}"
         )
 
-    # ===== CHECK SUB =====
+    # CHECK SUB
     @bot.callback_query_handler(func=lambda c: c.data == "check_sub")
     def check(call):
 
@@ -115,3 +112,8 @@ ID: {call.from_user.id}
             bot.send_message(call.message.chat.id, "✅ Подписка активна")
         else:
             bot.send_message(call.message.chat.id, "❌ Подписки нет")
+
+    @bot.message_handler(func=lambda m: True)
+    def debug(message):
+        print("USER ID:", message.from_user.id)
+        print("CHAT ID:", message.chat.id)

@@ -8,8 +8,9 @@ def register_admin(bot):
     # ADMIN PANEL
     @bot.message_handler(commands=['admin'])
     def admin_panel(message):
-
-        if message.from_user.id != ADMIN_ID:
+        print('Admin command executed')
+        if message.from_user.id not in ADMIN_ID:
+            print('Admin id not found')
             return
 
         markup = types.InlineKeyboardMarkup()
@@ -41,21 +42,35 @@ def register_admin(bot):
             reply_markup=markup
         )
 
-    # ========= USERS =========
-
+    # USERS
     @bot.callback_query_handler(func=lambda c: c.data == "admin_users")
     def users(call):
 
-        if call.from_user.id != ADMIN_ID:
+        if call.from_user.id not in ADMIN_ID:
             return
 
-        cursor.execute("SELECT COUNT(*) FROM users")
-        total = cursor.fetchone()[0]
+        cursor.execute("SELECT user_id FROM users")
+        users = cursor.fetchall()
+
+        if not users:
+            bot.send_message(call.message.chat.id, "Нет пользователей")
+            return
+
+        user_ids = [str(user[0]) for user in users]
+
+        text = "👥 Пользователи:\n\n" + "\n".join(user_ids)
+
+        # если слишком длинное сообщение — режем
+        if len(text) > 4000:
+            for i in range(0, len(user_ids), 100):
+                chunk = "\n".join(user_ids[i:i + 100])
+                bot.send_message(call.message.chat.id, chunk)
+        else:
+            bot.send_message(call.message.chat.id, text)
 
         bot.send_message(
             call.message.chat.id,
-            f"👥 Всего пользователей: {total}\n\n"
-            "Отправь ID пользователя"
+            "\nОтправь ID пользователя для управления"
         )
 
         bot.register_next_step_handler(
@@ -65,7 +80,7 @@ def register_admin(bot):
 
     def user_manage(message):
 
-        if message.from_user.id != ADMIN_ID:
+        if message.from_user.id not in ADMIN_ID:
             return
 
         try:
@@ -98,7 +113,7 @@ def register_admin(bot):
     @bot.callback_query_handler(func=lambda c: c.data.startswith("give_"))
     def give(call):
 
-        if call.from_user.id != ADMIN_ID:
+        if call.from_user.id not in ADMIN_ID:
             return
 
         user_id = int(call.data.split("_")[1])
@@ -113,7 +128,7 @@ def register_admin(bot):
     @bot.callback_query_handler(func=lambda c: c.data.startswith("remove_"))
     def remove(call):
 
-        if call.from_user.id != ADMIN_ID:
+        if call.from_user.id not in ADMIN_ID:
             return
 
         cursor.execute("""
@@ -164,7 +179,7 @@ def register_admin(bot):
 
     def send_broadcast(message):
 
-        if message.from_user.id != ADMIN_ID:
+        if message.from_user.id not in ADMIN_ID:
             return
 
         text = message.text
