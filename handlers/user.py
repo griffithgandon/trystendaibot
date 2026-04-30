@@ -1,7 +1,7 @@
 from telebot import types
 from keyboards.menu import main_menu
 from database.database import *
-from services.vpn import create_or_update_user
+from services.vpn import create_user
 from config import ADMIN_ID
 
 
@@ -79,7 +79,7 @@ def register_handlers(bot):
 
         set_subscription(user_id, 30)
 
-        vpn_id = create_or_update_user(user_id, 30)
+        vpn_id = create_user(user_id, 30)
 
         save_vpn_id(user_id, vpn_id)
 
@@ -112,8 +112,3 @@ def register_handlers(bot):
             bot.send_message(call.message.chat.id, "✅ Подписка активна")
         else:
             bot.send_message(call.message.chat.id, "❌ Подписки нет")
-
-    @bot.message_handler(func=lambda m: True)
-    def debug(message):
-        print("USER ID:", message.from_user.id)
-        print("CHAT ID:", message.chat.id)
