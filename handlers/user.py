@@ -1,93 +1,60 @@
 from telebot import types
 from keyboards.menu import main_menu
 from database.database import *
-from services.vpn import create_user
+from services.vpn import create_user, get_vpn_data
 from config import ADMIN_ID
+import qrcode
 
 
 def register_handlers(bot):
 
-    # START
     @bot.message_handler(commands=['start'])
     def start(message):
         add_user(message.from_user.id)
 
-        bot.send_message(
-            message.chat.id,
-            "TRYSTENDAI",
-            reply_markup=main_menu()
-        )
+        bot.send_message(message.chat.id, "TRYSTENDAI", reply_markup=main_menu())
 
-    # PROFILE
     @bot.callback_query_handler(func=lambda c: c.data == "profile")
     def profile(call):
-
         status = "✅ Активна" if has_sub(call.from_user.id) else "❌ Нет"
 
         bot.send_message(
             call.message.chat.id,
-            f"""👤 Профиль\nID: {call.from_user.id}\nПодписка: {status}"""
+            f"👤 ID: {call.from_user.id}\nПодписка: {status}"
         )
 
-    # BUY
     @bot.callback_query_handler(func=lambda c: c.data == "buy")
     def buy(call):
-
         markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("✅ Я оплатил", callback_data="paid"))
 
-        markup.add(
-            types.InlineKeyboardButton(
-                "✅ Я оплатил",
-                callback_data="paid"
-            )
-        )
+        bot.send_message(call.message.chat.id, "Оплати и нажми кнопку", reply_markup=markup)
 
-        bot.send_message(
-            call.message.chat.id,
-            "Переведи 100₽ на карту XXXXX\nПосле оплаты нажми кнопку",
-            reply_markup=markup
-        )
-
-    # USER CLICK PAID
     @bot.callback_query_handler(func=lambda c: c.data == "paid")
     def paid(call):
-
         markup = types.InlineKeyboardMarkup()
-
         markup.add(
             types.InlineKeyboardButton(
                 "✅ Подтвердить",
                 callback_data=f"approve_{call.from_user.id}"
             )
         )
-        for admin_id in ADMIN_ID:
-            try:
-                bot.send_message(
-                    admin_id,  # ← ВАЖНО: именно admin_id
-                    f"Оплата от {call.from_user.id}",
-                    reply_markup=markup
-                )
-                print(f"Отправлено админу {admin_id}")
-            except Exception as e:
-                print(f"Не удалось отправить админу {admin_id}: {e}")   
 
-    # ADMIN APPROVE
+        for admin in ADMIN_ID:
+            bot.send_message(admin, f"Оплата от {call.from_user.id}", reply_markup=markup)
+
     @bot.callback_query_handler(func=lambda c: c.data.startswith("approve_"))
     def approve(call):
 
         user_id = int(call.data.split("_")[1])
+        days = 30
 
-        set_subscription(user_id, 30)
+        set_subscription(user_id, days)
+        create_user(user_id, days)
 
-        vpn_id = create_user(user_id, 30)
+        bot.send_message(user_id, "✅ Подписка выдана")
 
-        save_vpn_id(user_id, vpn_id)
-
-        bot.send_message(user_id, "✅ Подписка активирована")
-
-        bot.answer_callback_query(call.id, "Готово")
-
-    # TOKEN
+    # ===== VPN =====
     @bot.callback_query_handler(func=lambda c: c.data == "token")
     def token(call):
 
@@ -95,20 +62,36 @@ def register_handlers(bot):
             bot.send_message(call.message.chat.id, "❌ Нет подписки")
             return
 
-        vpn_id = get_vpn_id(call.from_user.id)
+        data = get_vpn_data(call.from_user.id)
 
-        link = f"vless://{vpn_id}@YOUR_IP:443"
+        if not data:
+            bot.send_message(call.message.chat.id, "❌ VPN не найден")
+            return
 
-        bot.send_message(
-            call.message.chat.id,
-            f"🔑 Ваш VPN:\n{link}"
-        )
+        text = f"🔑 Твои данные VPN:\n\nVLESS:\n{data['vless']}"
 
-    # CHECK SUB
+        if data["subscription"]:
+            text += f"\n\n📡 Subscription:\n{data['subscription']}"
+        else:
+            text += "\n\n⚠️ Подписка не найдена"
+
+        bot.send_message(call.message.chat.id, text)
+
+        # 🔥 QR = ПОДПИСКА
+        if data["subscription"]:
+            qr = qrcode.make(data["subscription"])
+            qr.save("sub_qr.png")
+
+            with open("sub_qr.png", "rb") as f:
+                bot.send_photo(
+                    call.message.chat.id,
+                    f,
+                    caption="📡 QR подписки (все протоколы)"
+                )
+
     @bot.callback_query_handler(func=lambda c: c.data == "check_sub")
     def check(call):
-
         if has_sub(call.from_user.id):
-            bot.send_message(call.message.chat.id, "✅ Подписка активна")
+            bot.send_message(call.message.chat.id, "✅ Активна")
         else:
-            bot.send_message(call.message.chat.id, "❌ Подписки нет")
+            bot.send_message(call.message.chat.id, "❌ Нет")
