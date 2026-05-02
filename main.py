@@ -8,5 +8,4 @@ bot = telebot.TeleBot(BOT_TOKEN)
 register_handlers(bot)
 register_admin(bot)
 
-print("Bot started polling")
-bot.infinity_polling()
+bot.infinity_polling(skip_pending=True)
