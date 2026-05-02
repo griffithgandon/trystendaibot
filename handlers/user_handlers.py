@@ -18,7 +18,10 @@ def register_handlers(bot):
 
         markup.row(types.InlineKeyboardButton("📊 Проверить подписку", callback_data="check_sub"))
 
-        bot.send_message(message.chat.id, "TRYSTENDAI BOT", reply_markup=markup)
+        if message.from_user.id in ADMIN_ID:
+            markup.row(types.InlineKeyboardButton("⚙️ Админ меню", callback_data="admin_panel"))
+
+        bot.send_message(message.chat.id, "Телеграм бот: Trystendai", reply_markup=markup)
 
     @bot.callback_query_handler(func=lambda c: c.data == "profile")
     def profile(call):

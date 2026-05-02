@@ -1,7 +1,7 @@
 import telebot
 from config import BOT_TOKEN
-from handlers.user import register_handlers
-from handlers.admin_panel import register_admin
+from handlers.user_handlers import register_handlers
+from handlers.admin_handlers import register_admin
 
 bot = telebot.TeleBot(BOT_TOKEN)
 

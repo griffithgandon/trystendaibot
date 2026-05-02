@@ -4,13 +4,12 @@ from database.database import *
 from services.vpn import delete_user, create_user
 import time
 
-
 def register_admin(bot):
 
-    # Admin panel and inline buttons
-    @bot.message_handler(commands=['admin'])
-    def admin_panel(message):
-        if message.from_user.id not in ADMIN_ID:
+    # Админ команда и инлайн кнопки
+    @bot.callback_query_handler(func=lambda c: c.data == 'admin_panel')
+    def admin_panel(call):
+        if call.from_user.id not in ADMIN_ID:
             return
 
         markup = types.InlineKeyboardMarkup()
@@ -18,9 +17,9 @@ def register_admin(bot):
         markup.row(types.InlineKeyboardButton("📊 Статистика", callback_data="admin_stats"))
         markup.row(types.InlineKeyboardButton("📢 Рассылка", callback_data="admin_broadcast"))
 
-        bot.send_message(message.chat.id, "⚙️ ADMIN PANEL", reply_markup=markup)
+        bot.send_message(call.message.chat.id, "⚙️ Админ панель бота Trystendai", reply_markup=markup)
 
-    # List users command
+    # Команда показа списка пользователей
     @bot.callback_query_handler(func=lambda c: c.data == "admin_users")
     def users(call):
         if call.from_user.id not in ADMIN_ID:
@@ -46,6 +45,7 @@ def register_admin(bot):
         msg = bot.send_message(call.message.chat.id, "\nОтправь ID пользователя")
         bot.register_next_step_handler(msg, user_manage)
 
+    # Команда для вызова меню управления пользователем
     def user_manage(message):
         if message.from_user.id not in ADMIN_ID:
             return
@@ -67,13 +67,9 @@ def register_admin(bot):
             types.InlineKeyboardButton("♻️ Пересоздать", callback_data=f"recreate_{user_id}")
         )
 
-        bot.send_message(
-            message.chat.id,
-            f"Управление пользователем {user_id}",
-            reply_markup=markup
-        )
+        bot.send_message(message.chat.id, f"Управление пользователем {user_id}", reply_markup=markup)
 
-    # Give 30 days command
+    # Команда выдачи 30 дней пользователю
     @bot.callback_query_handler(func=lambda c: c.data.startswith("give_"))
     def give(call):
         if call.from_user.id not in ADMIN_ID:
@@ -88,7 +84,7 @@ def register_admin(bot):
         bot.send_message(user_id, "✅ Вам выдана подписка")
         bot.answer_callback_query(call.id, "Выдано")
 
-    # Remove sub from server command
+    # Команда удаления подписки с сервера
     @bot.callback_query_handler(func=lambda c: c.data.startswith("remove_"))
     def remove(call):
         if call.from_user.id not in ADMIN_ID:
@@ -116,10 +112,11 @@ def register_admin(bot):
 
         try:
             bot.send_message(user_id, "❌ Ваша подписка отключена")
-        except:
+        except Exception as e:
+            print(e)
             pass
 
-    # ===== RECREATE =====
+    # Команда пересоздания подписки
     @bot.callback_query_handler(func=lambda c: c.data.startswith("recreate_"))
     def recreate(call):
         if call.from_user.id not in ADMIN_ID:
@@ -132,7 +129,8 @@ def register_admin(bot):
 
         try:
             delete_user(user_id)
-        except:
+        except Exception as e:
+            print(e)
             pass
 
         set_subscription(user_id, days)
@@ -186,7 +184,8 @@ def register_admin(bot):
             try:
                 bot.send_message(user[0], text)
                 sent += 1
-            except:
+            except Exception as e:
+                print(e)
                 pass
 
         bot.send_message(message.chat.id, f"✅ Отправлено: {sent}")
