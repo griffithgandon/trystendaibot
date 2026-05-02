@@ -1,5 +1,4 @@
 from telebot import types
-from keyboards.menu import main_menu
 from database.database import *
 from services.vpn import create_user, get_vpn_data
 from config import ADMIN_ID
@@ -7,12 +6,19 @@ import qrcode
 
 
 def register_handlers(bot):
-
     @bot.message_handler(commands=['start'])
     def start(message):
         add_user(message.from_user.id)
+        markup = types.InlineKeyboardMarkup()
 
-        bot.send_message(message.chat.id, "TRYSTENDAI", reply_markup=main_menu())
+        markup.row(types.InlineKeyboardButton("👤 Профиль", callback_data="profile"))
+
+        markup.row(types.InlineKeyboardButton("💎 Купить VPN", callback_data="buy"),
+                   types.InlineKeyboardButton("🔑 Мой VPN", callback_data="token"))
+
+        markup.row(types.InlineKeyboardButton("📊 Проверить подписку", callback_data="check_sub"))
+
+        bot.send_message(message.chat.id, "TRYSTENDAI BOT", reply_markup=markup)
 
     @bot.callback_query_handler(func=lambda c: c.data == "profile")
     def profile(call):
