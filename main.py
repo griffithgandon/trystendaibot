@@ -8,4 +8,6 @@ bot = telebot.TeleBot(BOT_TOKEN)
 register_handlers(bot)
 register_admin(bot)
 
+print('Бот начал опрашивать сервер...')
+
 bot.infinity_polling(skip_pending=True)

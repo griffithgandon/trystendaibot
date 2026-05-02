@@ -10,7 +10,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 session = requests.Session()
 
 
-# ===== LOGIN =====
+# Логин в панель сервера
 def login():
     session.post(
         f"{PANEL_URL}/login",
@@ -22,7 +22,7 @@ def login():
     )
 
 
-# ===== CREATE USER =====
+# Создание пользователя на сервере
 def create_user(user_id, days):
     login()
 
@@ -55,7 +55,7 @@ def create_user(user_id, days):
     return True
 
 
-# ===== DELETE USER =====
+# Удаление пользователя с сервера
 def delete_user(user_id):
     login()
 
