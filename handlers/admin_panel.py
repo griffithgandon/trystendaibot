@@ -7,7 +7,7 @@ import time
 
 def register_admin(bot):
 
-    # ===== ADMIN PANEL =====
+    # Admin panel and inline buttons
     @bot.message_handler(commands=['admin'])
     def admin_panel(message):
         if message.from_user.id not in ADMIN_ID:
@@ -20,7 +20,7 @@ def register_admin(bot):
 
         bot.send_message(message.chat.id, "⚙️ ADMIN PANEL", reply_markup=markup)
 
-    # ===== USERS =====
+    # List users command
     @bot.callback_query_handler(func=lambda c: c.data == "admin_users")
     def users(call):
         if call.from_user.id not in ADMIN_ID:
@@ -73,7 +73,7 @@ def register_admin(bot):
             reply_markup=markup
         )
 
-    # ===== GIVE =====
+    # Give 30 days command
     @bot.callback_query_handler(func=lambda c: c.data.startswith("give_"))
     def give(call):
         if call.from_user.id not in ADMIN_ID:
@@ -88,7 +88,7 @@ def register_admin(bot):
         bot.send_message(user_id, "✅ Вам выдана подписка")
         bot.answer_callback_query(call.id, "Выдано")
 
-    # ===== REMOVE =====
+    # Remove sub from server command
     @bot.callback_query_handler(func=lambda c: c.data.startswith("remove_"))
     def remove(call):
         if call.from_user.id not in ADMIN_ID:
@@ -142,7 +142,7 @@ def register_admin(bot):
 
         bot.send_message(user_id, "♻️ Ваш VPN пересоздан")
 
-    # ===== STATS =====
+    # Stats command
     @bot.callback_query_handler(func=lambda c: c.data == "admin_stats")
     def stats(call):
         if call.from_user.id not in ADMIN_ID:
@@ -159,15 +159,10 @@ def register_admin(bot):
 
         bot.send_message(
             call.message.chat.id,
-            f"""
-📊 Статистика
-
-👥 Пользователей: {total}
-💎 Активных: {active}
-"""
+            f"""📊 Статистика\n👥 Пользователей: {total}\n💎 Активных: {active}"""
         )
 
-    # ===== BROADCAST =====
+    # Broadcast command
     @bot.callback_query_handler(func=lambda c: c.data == "admin_broadcast")
     def broadcast(call):
         if call.from_user.id not in ADMIN_ID:
