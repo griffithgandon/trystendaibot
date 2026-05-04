@@ -1,23 +1,33 @@
 import os
 from dotenv import load_dotenv
 
-INBOUND_IDS = 1,2,3,4
-
 load_dotenv()
 
+# ===== BOT =====
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-ADMIN_ID = list(map(int, os.getenv("ADMIN_ID").split(",")))
+# ===== ADMIN =====
+ADMIN_ID = list(map(int, os.getenv("ADMIN_ID", "").split(",")))
 
-DB_PATH = os.getenv('DB_PATH')
+# ===== DB =====
+DB_PATH = os.getenv("DB_PATH", "database/bot.db")
 
-SUB_BASE_URL = os.getenv("SUB_BASE_URL")
+# ===== VPN =====
 PANEL_URL = os.getenv("PANEL_URL")
+SUB_BASE_URL = os.getenv("SUB_BASE_URL")
 DOMAIN = os.getenv("DOMAIN")
-PORT = int(os.getenv("PORT"))
+PORT = int(os.getenv("PORT", 443))
 
+# ===== PANEL AUTH =====
 USERNAME = os.getenv("PANEL_LOGIN")
 PASSWORD = os.getenv("PANEL_PASSWORD")
 
+# ===== INBOUNDS =====
+INBOUND_IDS = list(map(int, os.getenv("INBOUND_IDS", "").split(",")))
 
-# CARD_NUMBER = os.getenv("CARD_NUMBER")
+# ===== DEBUG (чтобы больше не гадать) =====
+print("CONFIG CHECK:")
+print("PANEL_URL:", PANEL_URL)
+print("USERNAME:", USERNAME)
+print("PASSWORD:", PASSWORD)
+print("INBOUND_IDS:", INBOUND_IDS)
