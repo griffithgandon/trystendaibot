@@ -31,3 +31,16 @@ print("PANEL_URL:", PANEL_URL)
 print("USERNAME:", USERNAME)
 print("PASSWORD:", PASSWORD)
 print("INBOUND_IDS:", INBOUND_IDS)
+
+#
+PAYMENT_TEXT = """
+💳 Оплата VPN
+
+💰 Цена: 100₽ / 30 дней
+
+Способы оплаты:
+— СБП: +7XXXXXXXXXX
+— Карта: 2200 0000 0000 0000
+
+📌 После оплаты нажми кнопку ниже
+"""

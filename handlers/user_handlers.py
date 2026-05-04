@@ -3,6 +3,8 @@ from config import ADMIN_ID
 from database.db import *
 from services.vpn import create_user, get_vpn_data
 from utils.qr import generate_qr
+from config import PAYMENT_TEXT
+
 
 
 # ===== UI =====
@@ -117,20 +119,45 @@ ID: {user_id}
 
 
     # ===== BUY =====
+    # ===== BUY =====
     @bot.callback_query_handler(func=lambda c: c.data == "buy")
     def buy(call):
-        bot.answer_callback_query(call.id)
+        markup = types.InlineKeyboardMarkup()
+        markup.add(
+            types.InlineKeyboardButton("✅ Я оплатил", callback_data="paid")
+        )
+        markup.add(
+            types.InlineKeyboardButton("⬅️ Назад", callback_data="menu")
+        )
+
+        bot.edit_message_text(
+            PAYMENT_TEXT,
+            call.message.chat.id,
+            call.message.message_id,
+            reply_markup=markup
+        )
+
+    # ===== PAID =====
+    @bot.callback_query_handler(func=lambda c: c.data == "paid")
+    def paid(call):
+        user_id = call.from_user.id
 
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("✅ Я оплатил", callback_data="paid"))
-        markup.add(types.InlineKeyboardButton("⬅️ Назад", callback_data="menu"))
-
-        safe_edit(
-            bot,
-            call,
-            "💎 Оплати VPN и нажми кнопку ниже",
-            markup
+        markup.add(
+            types.InlineKeyboardButton(
+                "✅ Подтвердить",
+                callback_data=f"approve_{user_id}"
+            )
         )
+
+        for admin in ADMIN_ID:
+            bot.send_message(
+                admin,
+                f"💰 Новая оплата!\n\n👤 ID: {user_id}",
+                reply_markup=markup
+            )
+
+        bot.answer_callback_query(call.id, "⏳ Ожидай подтверждения")
 
 
     # ===== PAID =====
@@ -153,14 +180,19 @@ ID: {user_id}
     # ===== APPROVE =====
     @bot.callback_query_handler(func=lambda c: c.data.startswith("approve_"))
     def approve(call):
-        bot.answer_callback_query(call.id)
-
         user_id = int(call.data.split("_")[1])
 
-        set_subscription(user_id, 30)
-        create_user(user_id, 30)
+        try:
+            set_subscription(user_id, 30)
+            create_user(user_id, 30)
 
-        bot.send_message(user_id, "✅ Подписка выдана")
+            bot.send_message(user_id, "✅ Оплата подтверждена!\nVPN выдан")
+
+            bot.answer_callback_query(call.id, "Готово")
+
+        except Exception as e:
+            print("APPROVE ERROR:", e)
+            bot.answer_callback_query(call.id, "Ошибка")
 
 
     # ===== VPN =====

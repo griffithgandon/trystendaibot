@@ -35,47 +35,56 @@ def login():
 
 
 def create_user(user_id, days):
+    print("🔥 CREATE USER:", user_id)
+
     if not login():
+        print("❌ LOGIN FAILED")
         return False
 
     expire = int((time.time() + days * 86400) * 1000)
+
     sub_id = str(uuid4()).replace("-", "")[:16]
+    username = get_username(user_id) or f"user_{user_id}"
 
     success = False
 
     for inbound_id in INBOUND_IDS:
 
-        client = {
-            "id": str(uuid4()),
+        client_uuid = str(uuid4())
+
+        client_data = {
+            "id": client_uuid,
             "email": f"{user_id}_{inbound_id}",
+            "enable": True,
+            "expiryTime": expire,
             "limitIp": 1,
             "totalGB": 0,
-            "expiryTime": expire,
-            "enable": True,
-            "subId": sub_id
+            "subId": sub_id,
+            "comment": username
         }
 
         payload = {
             "id": inbound_id,
             "settings": json.dumps({
-                "clients": [client]
+                "clients": [client_data]
             })
         }
 
         try:
             r = session.post(
-                f"{PANEL_URL}/xui/inbound/addClient",
+                f"{PANEL_URL}/panel/api/inbounds/addClient",
                 json=payload,
                 verify=False
             )
 
-            print("CREATE:", r.status_code, r.text)
+            print("ADD STATUS:", r.status_code)
+            print("ADD RAW:", r.text)
 
             if r.status_code == 200:
                 success = True
 
         except Exception as e:
-            print("CREATE ERROR:", e)
+            print("ADD ERROR:", e)
 
     return success
 
