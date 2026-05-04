@@ -32,7 +32,7 @@ print("USERNAME:", USERNAME)
 print("PASSWORD:", PASSWORD)
 print("INBOUND_IDS:", INBOUND_IDS)
 
-#
+# Форма оплаты
 PAYMENT_TEXT = """
 💳 Оплата VPN
 
