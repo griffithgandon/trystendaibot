@@ -8,18 +8,11 @@ cursor = conn.cursor()
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS users(
     user_id INTEGER PRIMARY KEY,
-    sub_until INTEGER DEFAULT 0,
-    username TEXT
+    username TEXT,
+    sub_until INTEGER DEFAULT 0
 )
 """)
 conn.commit()
-
-# 🔥 фикс для старой базы
-try:
-    cursor.execute("ALTER TABLE users ADD COLUMN username TEXT")
-    conn.commit()
-except:
-    pass
 
 
 def add_user(user_id):
@@ -44,7 +37,7 @@ def get_username(user_id):
         (user_id,)
     )
     row = cursor.fetchone()
-    return row[0] if row and row[0] else None
+    return row[0] if row else None
 
 
 def set_subscription(user_id, days):
@@ -57,14 +50,10 @@ def set_subscription(user_id, days):
     conn.commit()
 
 
-def get_subscription(user_id):
+def has_sub(user_id):
     cursor.execute(
         "SELECT sub_until FROM users WHERE user_id=?",
         (user_id,)
     )
     row = cursor.fetchone()
-    return int(row[0]) if row and row[0] else 0
-
-
-def has_sub(user_id):
-    return get_subscription(user_id) > int(time.time())
+    return row and row[0] > int(time.time())

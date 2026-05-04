@@ -1,13 +1,19 @@
-import telebot
-from config import BOT_TOKEN
+from telebot import TeleBot
 from handlers.user_handlers import register_handlers
 from handlers.admin_handlers import register_admin
+from config import BOT_TOKEN
+import time
 
-bot = telebot.TeleBot(BOT_TOKEN)
+bot = TeleBot(BOT_TOKEN)
 
 register_handlers(bot)
 register_admin(bot)
 
-print('Бот начал опрашивать сервер...')
+print("🚀 BOT START")
 
-bot.infinity_polling(skip_pending=True)
+while True:
+    try:
+        bot.infinity_polling()
+    except Exception as e:
+        print("CRASH:", e)
+        time.sleep(3)
