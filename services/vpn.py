@@ -2,8 +2,9 @@ import requests
 import json
 import time
 from uuid import uuid4
-from config import PANEL_URL, USERNAME, PASSWORD, INBOUND_IDS, SUB_BASE_URL
+from config import PANEL_URL, PANEL_LOGIN, PANEL_PASSWORD, INBOUND_IDS, SUB_BASE_URL
 from database.db import get_username
+
 
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -18,8 +19,8 @@ def login():
         r = session.post(
             f"{PANEL_URL}/login",
             data={
-                "username": USERNAME,
-                "password": PASSWORD
+                "username": PANEL_LOGIN,
+                "password": PANEL_PASSWORD,
             },
             verify=False
         )
@@ -141,7 +142,7 @@ def delete_user(user_id):
 
     success = False
 
-    for inbound in data.get("obj", []):
+    for inbound in (data or {}).get("obj", []):
         inbound_id = inbound["id"]
 
         for client in inbound.get("clientStats", []):
