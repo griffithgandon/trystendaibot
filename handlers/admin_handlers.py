@@ -1,6 +1,6 @@
 from telebot import types
 from config import ADMIN_ID
-from database.db import set_subscription, conn, cursor
+from database.db import *
 from services.vpn import create_user, delete_user
 import time
 
@@ -9,7 +9,7 @@ def is_admin(user_id):
     return user_id in ADMIN_ID
 
 
-# ===== SAFE EDIT (фикс ошибки message is not modified) =====
+# ===== SAFE EDIT =====
 def safe_edit(bot, call, text, markup):
     try:
         bot.edit_message_text(
@@ -26,65 +26,134 @@ def safe_edit(bot, call, text, markup):
 # ===== UI =====
 def admin_menu():
     markup = types.InlineKeyboardMarkup()
+
     markup.add(
-        types.InlineKeyboardButton("👥 Пользователи", callback_data="admin_users"),
-        types.InlineKeyboardButton("📊 Статистика", callback_data="admin_stats"),
-        types.InlineKeyboardButton("📢 Рассылка", callback_data="admin_broadcast"),
-        types.InlineKeyboardButton("⬅️ Назад", callback_data="menu")
+        types.InlineKeyboardButton(
+            "👥 Пользователи",
+            callback_data="admin_users"
+        )
     )
+
+    markup.add(
+        types.InlineKeyboardButton(
+            "💰 Заявки",
+            callback_data="pending_list"
+        )
+    )
+
+    markup.add(
+        types.InlineKeyboardButton(
+            "📊 Статистика",
+            callback_data="admin_stats"
+        )
+    )
+
+    markup.add(
+        types.InlineKeyboardButton(
+            "📢 Рассылка",
+            callback_data="admin_broadcast"
+        )
+    )
+
+    markup.add(
+        types.InlineKeyboardButton(
+            "⬅️ Назад",
+            callback_data="menu"
+        )
+    )
+
     return markup
 
 
 def back():
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("⬅️ Назад", callback_data="admin_panel"))
+
+    markup.add(
+        types.InlineKeyboardButton(
+            "⬅️ Назад",
+            callback_data="admin_panel"
+        )
+    )
+
     return markup
 
 
 # ===== HANDLERS =====
-def register_admin(bot):
+def register_admin_handlers(bot):
 
-    # ===== ПАНЕЛЬ =====
-    @bot.callback_query_handler(func=lambda c: c.data == "admin_panel")
+    # ===== ADMIN PANEL =====
+    @bot.callback_query_handler(
+        func=lambda c: c.data == "admin_panel"
+    )
     def admin_panel(call):
+
         if not is_admin(call.from_user.id):
             return
 
         bot.answer_callback_query(call.id)
 
-        safe_edit(bot, call, "⚙️ Админ панель", admin_menu())
+        safe_edit(
+            bot,
+            call,
+            "⚙️ Админ панель",
+            admin_menu()
+        )
 
-
-    # ===== ПОЛЬЗОВАТЕЛИ =====
-    @bot.callback_query_handler(func=lambda c: c.data == "admin_users")
+    # ===== USERS =====
+    @bot.callback_query_handler(
+        func=lambda c: c.data == "admin_users"
+    )
     def users(call):
+
         if not is_admin(call.from_user.id):
             return
 
         bot.answer_callback_query(call.id)
 
-        cursor.execute("SELECT user_id FROM users ORDER BY user_id DESC LIMIT 20")
+        cursor.execute(
+            "SELECT user_id FROM users ORDER BY user_id DESC LIMIT 20"
+        )
+
         rows = cursor.fetchall()
 
         markup = types.InlineKeyboardMarkup()
 
         for u in rows:
+
             user_id = u[0]
+
+            username = get_username(user_id)
+
+            if not username:
+                username = "Без ника"
+
             markup.add(
                 types.InlineKeyboardButton(
-                    f"👤 {user_id}",
+                    f"👤 {username} | {user_id}",
                     callback_data=f"user_{user_id}"
                 )
             )
 
-        markup.add(types.InlineKeyboardButton("⬅️ Назад", callback_data="admin_panel"))
+        markup.add(
+            types.InlineKeyboardButton(
+                "⬅️ Назад",
+                callback_data="admin_panel"
+            )
+        )
 
-        safe_edit(bot, call, "👥 Последние пользователи:", markup)
+        safe_edit(
+            bot,
+            call,
+            "👥 Последние пользователи:",
+            markup
+        )
 
-
-    # ===== ПОЛЬЗОВАТЕЛЬ =====
-    @bot.callback_query_handler(func=lambda c: c.data.startswith("user_"))
+    # ===== USER MENU =====
+    @bot.callback_query_handler(
+        func=lambda c: c.data.startswith("user_")
+    )
     def user_menu(call):
+
         if not is_admin(call.from_user.id):
             return
 
@@ -92,24 +161,80 @@ def register_admin(bot):
 
         user_id = int(call.data.split("_")[1])
 
+        username = get_username(user_id) or "—"
+
+        tg_username = (
+                get_telegram_username(user_id)
+                or "нет"
+        )
+
         markup = types.InlineKeyboardMarkup()
+
         markup.add(
-            types.InlineKeyboardButton("✅ Выдать", callback_data=f"give_{user_id}"),
-            types.InlineKeyboardButton("❌ Удалить", callback_data=f"remove_{user_id}")
-        )
-        markup.add(
-            types.InlineKeyboardButton("♻️ Пересоздать", callback_data=f"recreate_{user_id}")
-        )
-        markup.add(
-            types.InlineKeyboardButton("⬅️ Назад", callback_data="admin_users")
+            types.InlineKeyboardButton(
+                "✅ Выдать",
+                callback_data=f"give_{user_id}"
+            ),
+
+            types.InlineKeyboardButton(
+                "❌ Удалить",
+                callback_data=f"remove_{user_id}"
+            )
         )
 
-        safe_edit(bot, call, f"👤 Пользователь: {user_id}", markup)
+        markup.add(
+            types.InlineKeyboardButton(
+                "♻️ Пересоздать",
+                callback_data=f"recreate_{user_id}"
+            )
+        )
 
+        markup.add(
+            types.InlineKeyboardButton(
+                "⬅️ Назад",
+                callback_data="admin_users"
+            )
+        )
 
-    # ===== ВЫДАТЬ =====
-    @bot.callback_query_handler(func=lambda c: c.data.startswith("give_"))
+        username = get_username(user_id)
+
+        sub_until = get_sub_until(user_id)
+
+        if sub_until > int(time.time()):
+            sub_text = time.strftime(
+                "%d.%m.%Y %H:%M",
+                time.localtime(sub_until)
+            )
+        else:
+            sub_text = "Нет подписки"
+
+        if not username:
+            username = "Без ника"
+
+        text = f"""
+        👤 Пользователь
+
+        🪪 Ник: {username}
+        🌐 Telegram: @{tg_username}
+        🆔 ID: {user_id}
+
+        💎 Подписка:
+        {sub_text}
+        """
+        
+        safe_edit(
+            bot,
+            call,
+            text,
+            markup
+        )
+
+    # ===== GIVE =====
+    @bot.callback_query_handler(
+        func=lambda c: c.data.startswith("give_")
+    )
     def give(call):
+
         if not is_admin(call.from_user.id):
             return
 
@@ -118,20 +243,32 @@ def register_admin(bot):
         user_id = int(call.data.split("_")[1])
 
         try:
+
             set_subscription(user_id, 30)
+
             create_user(user_id, 30)
 
-            safe_edit(bot, call, f"✅ Выдано {user_id}", back())
+            safe_edit(
+                bot,
+                call,
+                f"✅ Выдано {user_id}",
+                back()
+            )
 
-            bot.send_message(user_id, "✅ Подписка выдана")
+            bot.send_message(
+                user_id,
+                "✅ Подписка выдана"
+            )
 
         except Exception as e:
             print("GIVE ERROR:", e)
 
-
-    # ===== УДАЛИТЬ (ПОЛНЫЙ ФИКС) =====
-    @bot.callback_query_handler(func=lambda c: c.data.startswith("remove_"))
+    # ===== REMOVE =====
+    @bot.callback_query_handler(
+        func=lambda c: c.data.startswith("remove_")
+    )
     def remove(call):
+
         if not is_admin(call.from_user.id):
             return
 
@@ -140,19 +277,16 @@ def register_admin(bot):
         user_id = int(call.data.split("_")[1])
 
         try:
-            print("DELETE USER:", user_id)
 
-            result = delete_user(user_id)
-            print("DELETE RESULT:", result)
+            delete_user(user_id)
 
-            # ===== УДАЛЯЕМ ПОДПИСКУ ИЗ БД =====
             cursor.execute(
                 "UPDATE users SET sub_until = 0 WHERE user_id = ?",
                 (user_id,)
             )
+
             conn.commit()
 
-            # ===== ОБНОВЛЯЕМ UI =====
             safe_edit(
                 bot,
                 call,
@@ -170,11 +304,13 @@ def register_admin(bot):
 
         except Exception as e:
             print("DELETE ERROR:", e)
-            bot.answer_callback_query(call.id, "Ошибка удаления")
 
-    # ===== ПЕРЕСОЗДАТЬ =====
-    @bot.callback_query_handler(func=lambda c: c.data.startswith("recreate_"))
+    # ===== RECREATE =====
+    @bot.callback_query_handler(
+        func=lambda c: c.data.startswith("recreate_")
+    )
     def recreate(call):
+
         if not is_admin(call.from_user.id):
             return
 
@@ -183,21 +319,34 @@ def register_admin(bot):
         user_id = int(call.data.split("_")[1])
 
         try:
+
             delete_user(user_id)
+
             set_subscription(user_id, 30)
+
             create_user(user_id, 30)
 
-            safe_edit(bot, call, f"♻️ Пересоздан {user_id}", back())
+            safe_edit(
+                bot,
+                call,
+                f"♻️ Пересоздан {user_id}",
+                back()
+            )
 
-            bot.send_message(user_id, "♻️ VPN пересоздан")
+            bot.send_message(
+                user_id,
+                "♻️ VPN пересоздан"
+            )
 
         except Exception as e:
             print("RECREATE ERROR:", e)
 
-
-    # ===== СТАТИСТИКА =====
-    @bot.callback_query_handler(func=lambda c: c.data == "admin_stats")
+    # ===== STATS =====
+    @bot.callback_query_handler(
+        func=lambda c: c.data == "admin_stats"
+    )
     def stats(call):
+
         if not is_admin(call.from_user.id):
             return
 
@@ -210,42 +359,129 @@ def register_admin(bot):
             "SELECT COUNT(*) FROM users WHERE sub_until > ?",
             (int(time.time()),)
         )
+
         active = cursor.fetchone()[0]
 
         safe_edit(
             bot,
             call,
-            f"📊 Статистика\n\n👥 Всего: {total}\n💎 Активных: {active}",
+            f"""
+📊 Статистика
+
+👥 Всего пользователей: {total}
+💎 Активных подписок: {active}
+""",
             back()
         )
 
+    # ===== PENDING PAYMENTS =====
+    @bot.callback_query_handler(
+        func=lambda c: c.data == "pending_list"
+    )
+    def pending_list(call):
 
-    # ===== РАССЫЛКА =====
-    @bot.callback_query_handler(func=lambda c: c.data == "admin_broadcast")
-    def broadcast(call):
         if not is_admin(call.from_user.id):
             return
 
         bot.answer_callback_query(call.id)
 
-        msg = bot.send_message(call.message.chat.id, "✍️ Введи текст")
-        bot.register_next_step_handler(msg, send_broadcast)
+        payments = get_pending_payments()
 
+        if not payments:
+
+            safe_edit(
+                bot,
+                call,
+                "❌ Активных заявок нет",
+                back()
+            )
+
+            return
+
+        markup = types.InlineKeyboardMarkup()
+
+        text = "💰 Активные заявки\n"
+
+        for user_id, tariff_id, created_at in payments:
+
+            username = get_username(user_id) or "Без ника"
+
+            text += f"""
+
+👤 {username}
+🆔 ID: {user_id}
+"""
+
+            markup.add(
+                types.InlineKeyboardButton(
+                    f"👤 {user_id}",
+                    callback_data=f"user_{user_id}"
+                )
+            )
+
+        markup.add(
+            types.InlineKeyboardButton(
+                "⬅️ Назад",
+                callback_data="admin_panel"
+            )
+        )
+
+        safe_edit(
+            bot,
+            call,
+            text,
+            markup
+        )
+
+    # ===== BROADCAST =====
+    @bot.callback_query_handler(
+        func=lambda c: c.data == "admin_broadcast"
+    )
+    def broadcast(call):
+
+        if not is_admin(call.from_user.id):
+            return
+
+        bot.answer_callback_query(call.id)
+
+        msg = bot.send_message(
+            call.message.chat.id,
+            "✍️ Введи текст рассылки"
+        )
+
+        bot.register_next_step_handler(
+            msg,
+            send_broadcast
+        )
 
     def send_broadcast(message):
+
         if not is_admin(message.from_user.id):
             return
 
-        cursor.execute("SELECT user_id FROM users")
+        cursor.execute(
+            "SELECT user_id FROM users"
+        )
+
         rows = cursor.fetchall()
 
         sent = 0
 
         for u in rows:
+
             try:
-                bot.send_message(u[0], message.text)
+
+                bot.send_message(
+                    u[0],
+                    message.text
+                )
+
                 sent += 1
+
             except:
                 pass
 
-        bot.send_message(message.chat.id, f"✅ Отправлено: {sent}")
+        bot.send_message(
+            message.chat.id,
+            f"✅ Отправлено: {sent}"
+        )

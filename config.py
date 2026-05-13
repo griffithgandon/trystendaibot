@@ -34,8 +34,8 @@ DB_PATH = os.getenv("DB_PATH", "database/bot.db")
 
 
 # ===== XRAY PANEL =====
-PANEL_URL = os.getenv("PANEL_URL")
-API_TOKEN = os.getenv("API_TOKEN")
+PANEL_URL = os.getenv("PANEL_URL", "")
+API_TOKEN = os.getenv("API_TOKEN", "")
 
 INBOUND_IDS = get_list("INBOUND_IDS")
 
@@ -57,19 +57,56 @@ HYSTERIA_PORT = get_int("HYSTERIA_PORT", 443)
 HYSTERIA_SNI = os.getenv("HYSTERIA_SNI", "")
 
 
+# ===== TARIFFS =====
+TARIFFS = {
+    "1": {
+        "title": "30 дней — 150₽",
+        "days": 30,
+        "price": 150
+    },
+
+    "2": {
+        "title": "90 дней — 450₽",
+        "days": 90,
+        "price": 450
+    },
+
+    "3": {
+        "title": "180 дней — 900₽",
+        "days": 180,
+        "price": 900
+    },
+    "4": {
+        "title": "360 дней — 1500",
+        "days": 360,
+        "price": 1500
+    }
+}
+
+
 # ===== PAYMENT =====
-PAYMENT_TEXT = os.getenv("PAYMENT_TEXT") or """
+SBP_NUMBER = os.getenv("SBP_NUMBER", "")
+CARD_NUMBER = os.getenv("CARD_NUMBER", "")
+
+PAYMENT_TEXT = f"""
 💳 Оплата VPN
 
-💰 Цена: 100₽ / 30 дней
+📌 После оплаты нажмите кнопку ниже
 
 Способы оплаты:
-— СБП: +79682753651
-— Карта: 2200 0000 0000 0000
-— В комментариях оплаты укажите свой id
 
-📌 После оплаты нажми кнопку ниже
+💸 СБП:
+{SBP_NUMBER}
+
+💳 Карта:
+{CARD_NUMBER}
+
+📝 В комментарии к переводу укажите свой Telegram ID
 """
+
+
+# ===== SUPPORT =====
+SUPPORT_USERNAME = os.getenv("SUPPORT_USERNAME", "@support")
 
 
 # ===== DEBUG =====
@@ -82,5 +119,9 @@ print("INBOUND_IDS:", INBOUND_IDS)
 
 print("DOMAIN:", DOMAIN)
 print("SUB_BASE_URL:", SUB_BASE_URL)
+
+print("HYSTERIA_ENABLED:", HYSTERIA_ENABLED)
+
+print("TARIFFS:", TARIFFS)
 
 print("====================")

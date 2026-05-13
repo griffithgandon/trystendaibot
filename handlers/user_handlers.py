@@ -1,39 +1,76 @@
 from telebot import types
-from config import ADMIN_ID
+import time
+
+from config import (
+    ADMIN_ID,
+    PAYMENT_TEXT,
+    TARIFFS
+)
+
 from database.db import *
 from services.vpn import create_user, get_vpn_data
+from services.vpn import create_user, get_vpn_data
 from utils.qr import generate_qr
-from config import PAYMENT_TEXT
-
 
 
 # ===== UI =====
 def get_main_menu(user_id):
+
     markup = types.InlineKeyboardMarkup(row_width=2)
 
     markup.add(
-        types.InlineKeyboardButton("👤 Профиль", callback_data="profile"),
-        types.InlineKeyboardButton("💎 Купить VPN", callback_data="buy"),
-        types.InlineKeyboardButton("🔑 Мой VPN", callback_data="token"),
-        types.InlineKeyboardButton("📊 Подписка", callback_data="check_sub")
+        types.InlineKeyboardButton(
+            "👤 Профиль",
+            callback_data="profile"
+        ),
+
+        types.InlineKeyboardButton(
+            "💎 Купить VPN",
+            callback_data="buy"
+        )
+    )
+
+    markup.add(
+        types.InlineKeyboardButton(
+            "🔑 Мой VPN",
+            callback_data="token"
+        ),
+
+        types.InlineKeyboardButton(
+            "💬 Поддержка",
+            callback_data="support"
+        )
     )
 
     if user_id in ADMIN_ID:
+
         markup.add(
-            types.InlineKeyboardButton("⚙️ Админ", callback_data="admin_panel")
+            types.InlineKeyboardButton(
+                "⚙️ Админ",
+                callback_data="admin_panel"
+            )
         )
 
     return markup
 
 
 def back_button():
+
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("⬅️ Назад", callback_data="menu"))
+
+    markup.add(
+        types.InlineKeyboardButton(
+            "⬅️ Назад",
+            callback_data="menu"
+        )
+    )
+
     return markup
 
 
-# ===== SAFE EDIT (фикс ошибки 400) =====
-def safe_edit(bot, call, text, markup):
+# ===== SAFE EDIT =====
+def safe_edit(bot, call, text, markup=None):
+
     try:
         bot.edit_message_text(
             text,
@@ -41,54 +78,103 @@ def safe_edit(bot, call, text, markup):
             call.message.message_id,
             reply_markup=markup
         )
-    except:
-        # если текст тот же — просто игнорим
-        pass
+
+    except Exception as e:
+        print("SAFE EDIT ERROR:", e)
 
 
 # ===== HANDLERS =====
 def register_handlers(bot):
 
     # ===== START =====
-    @bot.message_handler(commands=['start'])
+    @bot.message_handler(commands=["start"])
     def start(message):
-        user_id = message.from_user.id
 
-        add_user(user_id)
+        try:
+            user_id = message.from_user.id
 
-        if get_username(user_id):
+            add_user(
+                user_id,
+                message.from_user.username
+            )
+            # ===== TG USERNAME =====
+            telegram_username = message.from_user.username
+
+            if telegram_username:
+                cursor.execute(
+                    """
+                    UPDATE users
+                    SET telegram_username=?
+                    WHERE user_id = ?
+                    """,
+                    (
+                        telegram_username,
+                        user_id
+                    )
+                )
+
+                conn.commit()
+
+            # ===== ПРОВЕРКА НИКА =====
+            if get_username(user_id):
+
+                bot.send_message(
+                    message.chat.id,
+                    "📱 Главное меню:",
+                    reply_markup=get_main_menu(user_id)
+                )
+
+            else:
+
+                msg = bot.send_message(
+                    message.chat.id,
+                    "👋 Введи свой ник:"
+                )
+
+                bot.register_next_step_handler(
+                    msg,
+                    save_name
+                )
+
+        except Exception as e:
+            print("START ERROR:", e)
+
+    # ===== SAVE NAME =====
+    def save_name(message):
+
+        try:
+            user_id = message.from_user.id
+            username = message.text.strip()
+
+            if len(username) < 2:
+
+                msg = bot.send_message(
+                    message.chat.id,
+                    "❌ Ник слишком короткий"
+                )
+
+                bot.register_next_step_handler(
+                    msg,
+                    save_name
+                )
+
+                return
+
+            save_username(user_id, username)
+
             bot.send_message(
                 message.chat.id,
-                "📱 Главное меню:",
+                f"✅ Ник сохранён: {username}",
                 reply_markup=get_main_menu(user_id)
             )
-        else:
-            msg = bot.send_message(message.chat.id, "👋 Введи свой ник:")
-            bot.register_next_step_handler(msg, save_name)
 
-
-    # ===== SAVE USERNAME =====
-    def save_name(message):
-        user_id = message.from_user.id
-        username = message.text.strip()
-
-        if len(username) < 2:
-            msg = bot.send_message(message.chat.id, "❌ Ник слишком короткий, попробуй ещё:")
-            bot.register_next_step_handler(msg, save_name)
-            return
-
-        save_username(user_id, username)
-
-        bot.send_message(
-            message.chat.id,
-            f"✅ Ник сохранён: {username}",
-            reply_markup=get_main_menu(user_id)
-        )
-
+        except Exception as e:
+            print("SAVE NAME ERROR:", e)
 
     # ===== MENU =====
     @bot.callback_query_handler(func=lambda c: c.data == "menu")
     def menu(call):
+
         bot.answer_callback_query(call.id)
 
         safe_edit(
@@ -98,140 +184,433 @@ def register_handlers(bot):
             get_main_menu(call.from_user.id)
         )
 
-
     # ===== PROFILE =====
     @bot.callback_query_handler(func=lambda c: c.data == "profile")
     def profile(call):
-        bot.answer_callback_query(call.id)
 
-        user_id = call.from_user.id
-        username = get_username(user_id) or "—"
-        status = "✅ Активна" if has_sub(user_id) else "❌ Нет"
+        try:
+            bot.answer_callback_query(call.id)
 
-        text = f"""👤 Профиль
+            user_id = call.from_user.id
 
-ID: {user_id}
-Ник: {username}
-Подписка: {status}
+            username = get_username(user_id) or "—"
+
+            sub_until = get_sub_until(user_id)
+
+            if sub_until > int(time.time()):
+
+                date = time.strftime(
+                    "%d.%m.%Y %H:%M",
+                    time.localtime(sub_until)
+                )
+
+                status = f"✅ До {date}"
+
+            else:
+                status = "❌ Нет"
+
+            text = f"""
+👤 Профиль
+
+🆔 ID: {user_id}
+👤 Ник: {username}
+💎 Подписка: {status}
 """
 
-        safe_edit(bot, call, text, back_button())
+            safe_edit(
+                bot,
+                call,
+                text,
+                back_button()
+            )
 
+        except Exception as e:
+            print("PROFILE ERROR:", e)
 
-    # ===== BUY =====
     # ===== BUY =====
     @bot.callback_query_handler(func=lambda c: c.data == "buy")
     def buy(call):
-        markup = types.InlineKeyboardMarkup()
-        markup.add(
-            types.InlineKeyboardButton("✅ Я оплатил", callback_data="paid")
-        )
-        markup.add(
-            types.InlineKeyboardButton("⬅️ Назад", callback_data="menu")
-        )
-
-        bot.edit_message_text(
-            PAYMENT_TEXT,
-            call.message.chat.id,
-            call.message.message_id,
-            reply_markup=markup
-        )
-
-    # ===== PAID =====
-    @bot.callback_query_handler(func=lambda c: c.data == "paid")
-    def paid(call):
-        user_id = call.from_user.id
-
-        markup = types.InlineKeyboardMarkup()
-        markup.add(
-            types.InlineKeyboardButton(
-                "✅ Подтвердить",
-                callback_data=f"approve_{user_id}"
-            )
-        )
-
-        for admin in ADMIN_ID:
-            bot.send_message(
-                admin,
-                f"💰 Новая оплата!\n\n👤 ID: {user_id}",
-                reply_markup=markup
-            )
-
-        bot.answer_callback_query(call.id, "⏳ Ожидай подтверждения")
-
-
-    # ===== PAID =====
-    @bot.callback_query_handler(func=lambda c: c.data == "paid")
-    def paid(call):
-        bot.answer_callback_query(call.id)
-
-        markup = types.InlineKeyboardMarkup()
-        markup.add(
-            types.InlineKeyboardButton(
-                "✅ Подтвердить",
-                callback_data=f"approve_{call.from_user.id}"
-            )
-        )
-
-        for admin in ADMIN_ID:
-            bot.send_message(admin, f"💰 Оплата от {call.from_user.id}", reply_markup=markup)
-
-
-    # ===== APPROVE =====
-    @bot.callback_query_handler(func=lambda c: c.data.startswith("approve_"))
-    def approve(call):
-        user_id = int(call.data.split("_")[1])
 
         try:
-            set_subscription(user_id, 30)
-            create_user(user_id, 30)
+            bot.answer_callback_query(call.id)
 
-            bot.send_message(user_id, "✅ Оплата подтверждена!\nVPN выдан")
+            markup = types.InlineKeyboardMarkup(row_width=1)
 
-            bot.answer_callback_query(call.id, "Готово")
+            for tariff_id, tariff in TARIFFS.items():
+
+                markup.add(
+                    types.InlineKeyboardButton(
+                        tariff.get("title", "Тариф"),
+                        callback_data=f"tariff_{tariff_id}"
+                    )
+                )
+
+            markup.add(
+                types.InlineKeyboardButton(
+                    "⬅️ Назад",
+                    callback_data="menu"
+                )
+            )
+
+            safe_edit(
+                bot,
+                call,
+                "💎 Выбери тариф:",
+                markup
+            )
+
+        except Exception as e:
+            print("BUY ERROR:", e)
+
+    # ===== TARIFF =====
+    @bot.callback_query_handler(
+        func=lambda c: c.data.startswith("tariff_")
+    )
+    def tariff(call):
+
+        try:
+            bot.answer_callback_query(call.id)
+
+            tariff_id = call.data.split("_")[1]
+
+            tariff = TARIFFS.get(tariff_id)
+
+            if not tariff:
+                return
+
+            text = f"""
+{PAYMENT_TEXT}
+
+📦 Тариф: {tariff.get("title")}
+💰 Цена: {tariff.get("price")}₽
+📅 Срок: {tariff.get("days")} дней
+
+🆔 Ваш ID:
+{call.from_user.id}
+"""
+
+            markup = types.InlineKeyboardMarkup(row_width=1)
+
+            markup.add(
+                types.InlineKeyboardButton(
+                    "✅ Я оплатил",
+                    callback_data=f"paid_{tariff_id}"
+                )
+            )
+
+            markup.add(
+                types.InlineKeyboardButton(
+                    "⬅️ Назад",
+                    callback_data="buy"
+                )
+            )
+
+            safe_edit(
+                bot,
+                call,
+                text,
+                markup
+            )
+
+        except Exception as e:
+            print("TARIFF ERROR:", e)
+
+    # ===== PAID =====
+    @bot.callback_query_handler(
+        func=lambda c: c.data.startswith("paid_")
+    )
+    def paid(call):
+
+        try:
+            bot.answer_callback_query(call.id)
+
+            tariff_id = call.data.split("_")[1]
+
+            tariff = TARIFFS.get(tariff_id)
+
+            if not tariff:
+                return
+
+            user_id = call.from_user.id
+
+            if has_pending_payment(user_id):
+
+                bot.answer_callback_query(
+                    call.id,
+                    "⏳ У тебя уже есть заявка"
+                )
+
+                return
+
+            add_pending_payment(
+                user_id,
+                tariff_id
+            )
+
+            username = get_username(user_id) or "Без ника"
+
+            markup = types.InlineKeyboardMarkup()
+
+            markup.add(
+                types.InlineKeyboardButton(
+                    "✅ Подтвердить",
+                    callback_data=f"approve_{user_id}_{tariff_id}"
+                )
+            )
+
+            for admin in ADMIN_ID:
+
+                bot.send_message(
+                    admin,
+                    f"""
+💰 Новая заявка
+
+👤 Пользователь: {username}
+🆔 ID: {user_id}
+
+📦 Тариф: {tariff.get("title")}
+💰 Сумма: {tariff.get("price")}₽
+""",
+                    reply_markup=markup
+                )
+
+            safe_edit(
+                bot,
+                call,
+                """
+✅ Заявка отправлена
+
+⏳ Ожидайте подтверждения
+""",
+                back_button()
+            )
+
+        except Exception as e:
+            print("PAID ERROR:", e)
+
+    # ===== APPROVE =====
+    @bot.callback_query_handler(
+        func=lambda c: c.data.startswith("approve_")
+    )
+    def approve(call):
+
+        try:
+            if call.from_user.id not in ADMIN_ID:
+                return
+
+            _, user_id, tariff_id = call.data.split("_")
+
+            user_id = int(user_id)
+
+            tariff = TARIFFS.get(tariff_id)
+
+            if not tariff:
+                return
+
+            days = tariff.get("days", 30)
+
+            set_subscription(user_id, days)
+
+            create_user(user_id, days)
+
+            remove_pending_payment(user_id)
+
+            bot.send_message(
+                user_id,
+                f"""
+✅ Оплата подтверждена
+
+📦 Тариф: {tariff.get("title")}
+📅 Срок: {days} дней
+
+🔑 VPN активирован
+"""
+            )
+
+            safe_edit(
+                bot,
+                call,
+                "✅ Оплата подтверждена",
+                back_button()
+            )
+
+            bot.answer_callback_query(
+                call.id,
+                "✅ Готово"
+            )
 
         except Exception as e:
             print("APPROVE ERROR:", e)
-            bot.answer_callback_query(call.id, "Ошибка")
 
+    # ===== SUPPORT =====
+    @bot.callback_query_handler(
+        func=lambda c: c.data == "support"
+    )
+    def support(call):
 
-    # ===== VPN =====
-    @bot.callback_query_handler(func=lambda c: c.data == "token")
+        try:
+            bot.answer_callback_query(call.id)
+
+            msg = bot.send_message(
+                call.message.chat.id,
+                """
+💬 Поддержка
+
+Напиши сообщение администрации:
+"""
+            )
+
+            bot.register_next_step_handler(
+                msg,
+                send_support
+            )
+
+        except Exception as e:
+            print("SUPPORT ERROR:", e)
+
+    # ===== SEND SUPPORT =====
+    def send_support(message):
+
+        try:
+            user_id = message.from_user.id
+
+            username = (
+                get_username(user_id)
+                or "Без ника"
+            )
+
+            text = message.text
+
+            markup = types.InlineKeyboardMarkup()
+
+            markup.add(
+                types.InlineKeyboardButton(
+                    "✉️ Ответить",
+                    callback_data=f"reply_{user_id}"
+                )
+            )
+
+            for admin in ADMIN_ID:
+
+                bot.send_message(
+                    admin,
+                    f"""
+💬 Новое сообщение
+
+👤 Пользователь: {username}
+🆔 ID: {user_id}
+
+📩 Сообщение:
+{text}
+""",
+                    reply_markup=markup
+                )
+
+            bot.send_message(
+                user_id,
+                "✅ Сообщение отправлено"
+            )
+
+        except Exception as e:
+            print("SEND SUPPORT ERROR:", e)
+
+    # ===== REPLY =====
+    @bot.callback_query_handler(
+        func=lambda c: c.data.startswith("reply_")
+    )
+    def reply(call):
+
+        try:
+            if call.from_user.id not in ADMIN_ID:
+                return
+
+            bot.answer_callback_query(call.id)
+
+            user_id = int(
+                call.data.split("_")[1]
+            )
+
+            msg = bot.send_message(
+                call.message.chat.id,
+                f"✉️ Ответ пользователю {user_id}:"
+            )
+
+            bot.register_next_step_handler(
+                msg,
+                lambda m: send_reply(
+                    m,
+                    user_id
+                )
+            )
+
+        except Exception as e:
+            print("REPLY ERROR:", e)
+
+    # ===== SEND REPLY =====
+    def send_reply(message, user_id):
+
+        try:
+            bot.send_message(
+                user_id,
+                f"""
+💬 Ответ поддержки
+
+{message.text}
+"""
+            )
+
+            bot.send_message(
+                message.chat.id,
+                "✅ Ответ отправлен"
+            )
+
+        except Exception as e:
+            print("SEND REPLY ERROR:", e)
+
+    # ===== TOKEN =====
+    @bot.callback_query_handler(
+        func=lambda c: c.data == "token"
+    )
     def token(call):
-        bot.answer_callback_query(call.id)
 
-        user_id = call.from_user.id
+        try:
+            bot.answer_callback_query(call.id)
 
-        if not has_sub(user_id):
-            bot.answer_callback_query(call.id, "❌ Нет подписки")
-            return
+            user_id = call.from_user.id
 
-        sub = get_vpn_data(user_id)
+            if not has_sub(user_id):
 
-        if not sub:
-            bot.answer_callback_query(call.id, "❌ Подписка не найдена")
-            return
+                bot.answer_callback_query(
+                    call.id,
+                    "❌ Нет подписки"
+                )
 
-        text = f"""🔑 Твой VPN
+                return
+
+            sub = get_vpn_data(user_id)
+
+            if not sub:
+                return
+
+            text = f"""
+🔑 Твой VPN
 
 {sub}
 """
 
-        safe_edit(bot, call, text, back_button())
+            safe_edit(
+                bot,
+                call,
+                text,
+                back_button()
+            )
 
-        # QR (один раз, без спама)
-        try:
             qr = generate_qr(sub)
-            bot.send_photo(call.message.chat.id, qr)
+
+            bot.send_photo(
+                call.message.chat.id,
+                qr
+            )
+
         except Exception as e:
-            print("QR ERROR:", e)
-
-
-    # ===== CHECK =====
-    @bot.callback_query_handler(func=lambda c: c.data == "check_sub")
-    def check(call):
-        bot.answer_callback_query(call.id)
-
-        text = "✅ Подписка активна" if has_sub(call.from_user.id) else "❌ Нет подписки"
-
-        safe_edit(bot, call, text, back_button())
+            print("TOKEN ERROR:", e)
