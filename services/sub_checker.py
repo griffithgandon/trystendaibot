@@ -1,97 +1,45 @@
 import time
-from database.db import cursor, conn
-from config import ADMIN_ID
+from database.db import (
+    get_users_expiring_soon,
+    mark_reminded,
+    get_expired_users,
+    remove_sub,
+    conn,
+    cursor,
+)
 
 
 def check_subscriptions(bot):
-
-    now = int(time.time())
-
-    # ===== скоро закончится =====
-    two_days = now + (2 * 86400)
-
-    cursor.execute(
-        """
-        SELECT user_id, sub_until
-        FROM users
-        WHERE sub_until > ?
-        AND sub_until < ?
-        """,
-        (
-            now,
-            two_days
-        )
-    )
-
-    rows = cursor.fetchall()
-
-    for user_id, sub_until in rows:
-
+    # ===== Скоро закончится (один раз за цикл) =====
+    for user_id, sub_until in get_users_expiring_soon():
         try:
-
-            hours_left = int(
-                (sub_until - now) / 3600
-            )
-
-            # защита от спама
-            if hours_left > 49:
-                continue
+            hours_left = int((sub_until - time.time()) / 3600)
 
             bot.send_message(
                 user_id,
-                f"""
-⭐ Автопродление
-
-⏰ Подписка закончится через 2 дня
-
-💎 Продли VPN заранее,
-чтобы не потерять доступ
-"""
+                f"⭐ Подписка закончится через ~{hours_left} ч.\n\n"
+                "💎 Продли VPN заранее, чтобы не потерять доступ."
             )
+
+            # Помечаем — больше не напоминаем до следующей подписки
+            mark_reminded(user_id)
 
         except Exception as e:
             print("REMINDER ERROR:", e)
 
-    # ===== подписка закончилась =====
-    cursor.execute(
-        """
-        SELECT user_id
-        FROM users
-        WHERE sub_until > 0
-        AND sub_until < ?
-        """,
-        (now,)
-    )
-
-    expired = cursor.fetchall()
-
-    for row in expired:
-
-        user_id = row[0]
-
+    # ===== Подписка истекла =====
+    for (user_id,) in get_expired_users():
         try:
-
             bot.send_message(
                 user_id,
-                """
-❌ Подписка закончилась
-
-💎 Чтобы снова получить доступ —
-продли VPN
-"""
+                "❌ Подписка закончилась.\n\n"
+                "💎 Чтобы снова получить доступ — продли VPN."
             )
-
-            # чтобы не слал повторно
-            cursor.execute(
-                """
-                UPDATE users
-                SET sub_until = 0
-                WHERE user_id = ?
-                """,
-                (user_id,)
-            )
-
-            conn.commit()
-
         except Exception as e:
-            print("EXPIRED ERROR:", e)
+            print("EXPIRED NOTIFY ERROR:", e)
+
+        # Обнуляем независимо от успеха отправки
+        try:
+            remove_sub(user_id)
+        except Exception as e:
+            print("EXPIRED RESET ERROR:", e)
