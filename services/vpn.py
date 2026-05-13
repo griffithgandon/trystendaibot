@@ -2,50 +2,58 @@ import requests
 import json
 import time
 from uuid import uuid4
-from config import PANEL_URL, PANEL_LOGIN, PANEL_PASSWORD, INBOUND_IDS, SUB_BASE_URL
-from database.db import get_username
 
+from config import (
+    PANEL_URL,
+    API_TOKEN,
+    INBOUND_IDS,
+    SUB_BASE_URL,
+)
+
+from database.db import get_username
 
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 session = requests.Session()
 
+HEADERS = {
+    "Authorization": f"Bearer {API_TOKEN}",
+    "Accept": "application/json"
+}
 
-def login():
-    session.cookies.clear()
 
+# ===== GET INBOUNDS =====
+def get_inbounds():
     try:
-        r = session.post(
-            f"{PANEL_URL}/login",
-            data={
-                "username": PANEL_LOGIN,
-                "password": PANEL_PASSWORD,
-            },
+        r = session.get(
+            f"{PANEL_URL}/panel/api/inbounds/list",
+            headers=HEADERS,
             verify=False
         )
 
-        print("LOGIN STATUS:", r.status_code)
-        print("LOGIN RAW:", r.text[:200])
+        print("LIST STATUS:", r.status_code)
+        print("LIST RAW:", r.text[:500])
 
-        return r.status_code == 200
+        if r.status_code != 200:
+            return None
+
+        return r.json()
 
     except Exception as e:
-        print("LOGIN ERROR:", e)
-        return False
+        print("LIST ERROR:", e)
+        return None
 
 
+# ===== CREATE USER =====
 def create_user(user_id, days):
-    print("🔥 CREATE USER:", user_id)
-
-    if not login():
-        print("❌ LOGIN FAILED")
-        return False
+    print("CREATE USER:", user_id)
 
     expire = int((time.time() + days * 86400) * 1000)
 
-    sub_id = str(uuid4()).replace("-", "")[:16]
     username = get_username(user_id) or f"user_{user_id}"
+
+    sub_id = str(uuid4()).replace("-", "")[:16]
 
     success = False
 
@@ -53,7 +61,7 @@ def create_user(user_id, days):
 
         client_uuid = str(uuid4())
 
-        client_data = {
+        client = {
             "id": client_uuid,
             "email": f"{user_id}_{inbound_id}",
             "enable": True,
@@ -67,13 +75,14 @@ def create_user(user_id, days):
         payload = {
             "id": inbound_id,
             "settings": json.dumps({
-                "clients": [client_data]
+                "clients": [client]
             })
         }
 
         try:
             r = session.post(
                 f"{PANEL_URL}/panel/api/inbounds/addClient",
+                headers=HEADERS,
                 json=payload,
                 verify=False
             )
@@ -90,77 +99,53 @@ def create_user(user_id, days):
     return success
 
 
-def get_vpn_data(user_id):
-    if not login():
-        return None
-
-    r = session.get(f"{PANEL_URL}/panel/api/inbounds/list", verify=False)
-
-    try:
-        data = r.json()
-    except:
-        return None
-
-    for inbound in data.get("obj", []):
-        for client in inbound.get("clientStats", []):
-            if client.get("email", "").startswith(str(user_id)):
-                sub_id = client.get("subId")
-                if sub_id:
-                    return f"{SUB_BASE_URL}/{sub_id}"
-
-    return None
-
-
-def get_inbounds():
-    try:
-        r = session.get(
-            f"{PANEL_URL}/panel/api/inbounds/list",
-            verify=False
-        )
-
-        print("LIST STATUS:", r.status_code)
-        print("LIST RAW:", r.text[:300])
-
-        return r.json()
-
-    except Exception as e:
-        print("LIST ERROR:", e)
-        return None
-
-
-#удаление пользователя
+# ===== DELETE USER =====
 def delete_user(user_id):
-    print("🔥 DELETE START:", user_id)
-
-    if not login():
-        print("❌ LOGIN FAILED")
-        return False
+    print("DELETE USER:", user_id)
 
     data = get_inbounds()
+
     if not data:
+        print("NO INBOUNDS")
         return False
 
     success = False
 
-    for inbound in (data or {}).get("obj", []):
-        inbound_id = inbound["id"]
+    for inbound in data.get("obj", []):
 
-        for client in inbound.get("clientStats", []):
-            email = client.get("email")
-            uuid = client.get("uuid")
+        inbound_id = inbound.get("id")
 
-            # 🔥 ищем ТВОЕГО пользователя
-            if str(user_id) in email:
-                print("FOUND:", email, uuid)
+        # settings приходит строкой JSON
+        settings_raw = inbound.get("settings", "{}")
+
+        try:
+            settings = json.loads(settings_raw)
+        except Exception as e:
+            print("SETTINGS JSON ERROR:", e)
+            continue
+
+        clients = settings.get("clients", [])
+
+        for client in clients:
+
+            email = client.get("email", "")
+            client_id = client.get("id")
+
+            print("CHECK:", email)
+
+            if email.startswith(str(user_id)):
+
+                print("FOUND:", email, client_id)
 
                 try:
-                    url = f"{PANEL_URL}/panel/api/inbounds/{inbound_id}/delClient/{uuid}"
+                    r = session.post(
+                        f"{PANEL_URL}/panel/api/inbounds/{inbound_id}/delClient/{client_id}",
+                        headers=HEADERS,
+                        verify=False
+                    )
 
-                    r = session.post(url, verify=False)
-
-                    print("DELETE URL:", url)
-                    print("STATUS:", r.status_code)
-                    print("RAW:", r.text)
+                    print("DELETE STATUS:", r.status_code)
+                    print("DELETE RAW:", r.text)
 
                     if r.status_code == 200:
                         success = True
@@ -169,3 +154,27 @@ def delete_user(user_id):
                     print("DELETE ERROR:", e)
 
     return success
+
+
+# ===== GET SUB =====
+def get_vpn_data(user_id):
+
+    data = get_inbounds()
+
+    if not data:
+        return None
+
+    for inbound in data.get("obj", []):
+
+        for client in inbound.get("clientStats", []):
+
+            email = client.get("email", "")
+
+            if email.startswith(str(user_id)):
+
+                sub_id = client.get("subId")
+
+                if sub_id:
+                    return f"{SUB_BASE_URL}/{sub_id}"
+
+    return None

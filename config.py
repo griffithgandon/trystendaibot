@@ -34,9 +34,8 @@ DB_PATH = os.getenv("DB_PATH", "database/bot.db")
 
 
 # ===== XRAY PANEL =====
-PANEL_URL = os.getenv("PANEL_URL", "").rstrip("/")
-PANEL_LOGIN = os.getenv("PANEL_LOGIN", "")
-PANEL_PASSWORD = os.getenv("PANEL_PASSWORD", "")
+PANEL_URL = os.getenv("PANEL_URL")
+API_TOKEN = os.getenv("API_TOKEN")
 
 INBOUND_IDS = get_list("INBOUND_IDS")
 
@@ -75,11 +74,13 @@ PAYMENT_TEXT = os.getenv("PAYMENT_TEXT") or """
 
 # ===== DEBUG =====
 print("=== CONFIG CHECK ===")
-print("XRAY:", PANEL_URL)
-print("LOGIN:", PANEL_LOGIN)
+
+print("PANEL_URL:", PANEL_URL)
+print("API_TOKEN:", bool(API_TOKEN))
+
 print("INBOUND_IDS:", INBOUND_IDS)
 
-print("HYSTERIA_ENABLED:", HYSTERIA_ENABLED)
-print("HYSTERIA_HOST:", HYSTERIA_HOST)
-print("HYSTERIA_PORT:", HYSTERIA_PORT)
+print("DOMAIN:", DOMAIN)
+print("SUB_BASE_URL:", SUB_BASE_URL)
+
 print("====================")

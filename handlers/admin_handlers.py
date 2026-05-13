@@ -145,23 +145,32 @@ def register_admin(bot):
             result = delete_user(user_id)
             print("DELETE RESULT:", result)
 
-            # даже если API упал — обнуляем базу
+            # ===== УДАЛЯЕМ ПОДПИСКУ ИЗ БД =====
             cursor.execute(
                 "UPDATE users SET sub_until = 0 WHERE user_id = ?",
                 (user_id,)
             )
             conn.commit()
 
-            safe_edit(bot, call, f"❌ Пользователь {user_id} удалён", back())
+            # ===== ОБНОВЛЯЕМ UI =====
+            safe_edit(
+                bot,
+                call,
+                f"❌ Пользователь {user_id} удалён",
+                back()
+            )
 
             try:
-                bot.send_message(user_id, "❌ Подписка удалена")
+                bot.send_message(
+                    user_id,
+                    "❌ Ваша подписка удалена"
+                )
             except:
                 pass
 
         except Exception as e:
             print("DELETE ERROR:", e)
-
+            bot.answer_callback_query(call.id, "Ошибка удаления")
 
     # ===== ПЕРЕСОЗДАТЬ =====
     @bot.callback_query_handler(func=lambda c: c.data.startswith("recreate_"))
