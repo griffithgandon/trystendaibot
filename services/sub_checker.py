@@ -4,9 +4,8 @@ from database.db import (
     mark_reminded,
     get_expired_users,
     remove_sub,
-    conn,
-    cursor,
 )
+from services.vpn import delete_user
 
 
 def check_subscriptions(bot):
@@ -29,17 +28,26 @@ def check_subscriptions(bot):
 
     # ===== Подписка истекла =====
     for (user_id,) in get_expired_users():
-        try:
-            bot.send_message(
-                user_id,
-                "❌ Подписка закончилась.\n\n"
-                "💎 Чтобы снова получить доступ — продли VPN."
-            )
-        except Exception as e:
-            print("EXPIRED NOTIFY ERROR:", e)
 
-        # Обнуляем независимо от успеха отправки
+        # 1. Удаляем конфиг с VPN-панели
+        try:
+            deleted = delete_user(user_id)
+            print(f"VPN DELETE user={user_id} success={deleted}")
+        except Exception as e:
+            print(f"VPN DELETE ERROR user={user_id}:", e)
+
+        # 2. Обнуляем подписку в БД
         try:
             remove_sub(user_id)
         except Exception as e:
-            print("EXPIRED RESET ERROR:", e)
+            print(f"SUB RESET ERROR user={user_id}:", e)
+
+        # 3. Уведомляем пользователя
+        try:
+            bot.send_message(
+                user_id,
+                "❌ Подписка закончилась — VPN отключён.\n\n"
+                "💎 Чтобы снова получить доступ, продли VPN."
+            )
+        except Exception as e:
+            print(f"EXPIRED NOTIFY ERROR user={user_id}:", e)
