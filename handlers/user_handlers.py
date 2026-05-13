@@ -1,14 +1,16 @@
 from telebot import types
 import time
+import requests
 
 from config import (
     ADMIN_ID,
     PAYMENT_TEXT,
-    TARIFFS
+    TARIFFS,
+    PANEL_URL,
+    API_TOKEN
 )
 
 from database.db import *
-from services.vpn import create_user, get_vpn_data
 from services.vpn import create_user, get_vpn_data
 from utils.qr import generate_qr
 
@@ -39,6 +41,13 @@ def get_main_menu(user_id):
         types.InlineKeyboardButton(
             "💬 Поддержка",
             callback_data="support"
+        )
+    )
+
+    markup.add(
+        types.InlineKeyboardButton(
+            "🖥 Статус сервера",
+            callback_data="server_status"
         )
     )
 
@@ -97,7 +106,7 @@ def register_handlers(bot):
                 user_id,
                 message.from_user.username
             )
-            # ===== TG USERNAME =====
+
             telegram_username = message.from_user.username
 
             if telegram_username:
@@ -115,7 +124,6 @@ def register_handlers(bot):
 
                 conn.commit()
 
-            # ===== ПРОВЕРКА НИКА =====
             if get_username(user_id):
 
                 bot.send_message(
@@ -537,10 +545,7 @@ def register_handlers(bot):
 
             bot.register_next_step_handler(
                 msg,
-                lambda m: send_reply(
-                    m,
-                    user_id
-                )
+                lambda m: send_reply(m, user_id)
             )
 
         except Exception as e:
@@ -614,3 +619,58 @@ def register_handlers(bot):
 
         except Exception as e:
             print("TOKEN ERROR:", e)
+
+    # ===== SERVER STATUS =====
+    @bot.callback_query_handler(
+        func=lambda c: c.data == "server_status"
+    )
+    def server_status(call):
+
+        try:
+            bot.answer_callback_query(call.id)
+
+            headers = {
+                "Authorization": f"Bearer {API_TOKEN}",
+                "Accept": "application/json"
+            }
+
+            try:
+                start = time.time()
+
+                r = requests.get(
+                    f"{PANEL_URL}/panel/api/inbounds/list",
+                    headers=headers,
+                    verify=False,
+                    timeout=5
+                )
+
+                ping = int((time.time() - start) * 1000)
+
+                if r.status_code == 200:
+                    status = "🟢 Онлайн"
+                else:
+                    status = f"🟡 Ответил с ошибкой ({r.status_code})"
+
+            except requests.exceptions.Timeout:
+                status = "🔴 Нет ответа (таймаут)"
+                ping = None
+
+            except Exception:
+                status = "🔴 Недоступен"
+                ping = None
+
+            ping_text = (
+                f"\n⚡️ Пинг: {ping} мс"
+                if ping is not None
+                else ""
+            )
+
+            safe_edit(
+                bot,
+                call,
+                f"🖥 Статус сервера\n\n{status}{ping_text}",
+                back_button()
+            )
+
+        except Exception as e:
+            print("SERVER STATUS ERROR:", e)
