@@ -88,6 +88,15 @@ TARIFFS = {
 SBP_NUMBER = os.getenv("SBP_NUMBER", "")
 CARD_NUMBER = os.getenv("CARD_NUMBER", "")
 
+ADMIN_USERNAMES = os.getenv(
+    "ADMIN_USERNAMES",
+    ""
+).split(",")
+
+admins = "\n".join(
+    [f"@{x}" for x in ADMIN_USERNAMES]
+)
+
 PAYMENT_TEXT = f"""
 💳 Оплата VPN
 
@@ -100,6 +109,8 @@ PAYMENT_TEXT = f"""
 
 💳 Карта:
 {CARD_NUMBER}
+
+перед оплатой напишите одному из Админов 👉 {admins}
 
 📝 В комментарии к переводу укажите свой Telegram ID
 """

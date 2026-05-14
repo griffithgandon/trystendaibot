@@ -4,6 +4,7 @@ import requests
 import json
 from config import (
     ADMIN_ID,
+    ADMIN_USERNAMES,
     PAYMENT_TEXT,
     TARIFFS,
     PANEL_URL,
