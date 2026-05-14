@@ -30,33 +30,25 @@ with _lock:
     """)
     conn.commit()
 
-# ===== MIGRATIONS =====
-try:
-    cursor.execute("ALTER TABLE users ADD COLUMN reminded INTEGER DEFAULT 0")
-    conn.commit()
-    print("MIGRATION: added column 'reminded'")
-except Exception:
-    pass  # Колонка уже существует — всё ок
-    pass  # Колонка уже существует — всё ок
-    pass  # Колонка уже существует — всё ок
-# После существующей миграции reminded, добавить:
-try:
-    cursor.execute("ALTER TABLE pending_payments ADD COLUMN payment_type TEXT DEFAULT 'new'")
-    conn.commit()
-    print("MIGRATION: added column 'payment_type'")
-except Exception:
-    pass
-
 # ===== PENDING PAYMENTS TABLE =====
 with _lock:
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS pending_payments (
         user_id INTEGER PRIMARY KEY,
         tariff_id TEXT,
-        created_at INTEGER
+        created_at INTEGER,
+        payment_type TEXT DEFAULT 'new'
     )
     """)
     conn.commit()
+
+# ===== MIGRATIONS =====
+try:
+    cursor.execute("ALTER TABLE users ADD COLUMN reminded INTEGER DEFAULT 0")
+    conn.commit()
+    print("MIGRATION: added column 'reminded'")
+except Exception:
+    pass  # колонка уже существует
 
 
 # ── Хелпер ───────────────────────────────────────────────────────────────────
@@ -231,3 +223,13 @@ def get_pending_payment_type(user_id: int) -> str:
         (user_id,)
     )
     return row[0] if row else "new"
+
+def get_pending_payment_info(user_id: int) -> dict | None:
+    """Возвращает словарь {tariff_id, payment_type} или None."""
+    row = _fetchone(
+        "SELECT tariff_id, payment_type FROM pending_payments WHERE user_id=?",
+        (user_id,)
+    )
+    if not row:
+        return None
+    return {"tariff_id": row[0], "payment_type": row[1]}

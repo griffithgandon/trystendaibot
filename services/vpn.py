@@ -8,12 +8,15 @@ from config import (
     API_TOKEN,
     INBOUND_IDS,
     SUB_BASE_URL,
+    SSL_VERIFY,          # <- добавить
 )
 
 from database.db import get_username
 
+# Если всё же нужно заглушить предупреждения только когда verify=False:
 import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+if SSL_VERIFY is False:
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 session = requests.Session()
 
@@ -22,7 +25,6 @@ HEADERS = {
     "Accept": "application/json"
 }
 
-# Таймаут для всех запросов к панели (сек)
 REQUEST_TIMEOUT = 10
 
 
@@ -32,7 +34,7 @@ def get_inbounds() -> dict | None:
         r = session.get(
             f"{PANEL_URL}/panel/api/inbounds/list",
             headers=HEADERS,
-            verify=False,
+            verify=SSL_VERIFY,
             timeout=REQUEST_TIMEOUT
         )
 
@@ -81,7 +83,7 @@ def create_user(user_id: int, days: int) -> bool:
                 f"{PANEL_URL}/panel/api/inbounds/addClient",
                 headers=HEADERS,
                 json=payload,
-                verify=False,
+                verify=SSL_VERIFY,
                 timeout=REQUEST_TIMEOUT
             )
 
@@ -128,7 +130,7 @@ def delete_user(user_id: int) -> bool:
                 r = session.post(
                     f"{PANEL_URL}/panel/api/inbounds/{inbound_id}/delClient/{client_id}",
                     headers=HEADERS,
-                    verify=False,
+                    verify=SSL_VERIFY,
                     timeout=REQUEST_TIMEOUT
                 )
 
@@ -176,7 +178,7 @@ def get_online_users() -> list[str] | None:
         r = session.post(
             f"{PANEL_URL}/panel/api/inbounds/onlines",
             headers=HEADERS,
-            verify=False,
+            verify=SSL_VERIFY,
             timeout=REQUEST_TIMEOUT
         )
 
@@ -239,7 +241,7 @@ def extend_user(user_id: int, days: int) -> bool:
                     f"{PANEL_URL}/panel/api/inbounds/updateClient/{client_uuid}",
                     headers=HEADERS,
                     json=payload,
-                    verify=False,
+                    verify=SSL_VERIFY,
                     timeout=REQUEST_TIMEOUT
                 )
 

@@ -131,3 +131,15 @@ SERVERS = [
     {"name": os.getenv("SERVER1_NAME", "Сервер 1"), "url": os.getenv("SERVER1_URL", "")},
     {"name": os.getenv("SERVER2_NAME", "Сервер 2"), "url": os.getenv("SERVER2_URL", "")},
 ]
+
+# ===== TLS =====
+PANEL_VERIFY = os.getenv("PANEL_VERIFY", "true")
+
+# Если "false" — отключить проверку (только для разработки).
+# Иначе трактуем как путь к CA-сертификату или True (системные CA).
+if PANEL_VERIFY.lower() == "false":
+    SSL_VERIFY = False
+elif PANEL_VERIFY.lower() == "true":
+    SSL_VERIFY = True
+else:
+    SSL_VERIFY = PANEL_VERIFY  # путь к файлу, например "/etc/ssl/certs/panel.crt"

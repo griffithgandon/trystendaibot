@@ -11,15 +11,6 @@ from config import (
     SERVERS,  # добавить
 )
 
-
-from config import (
-    ADMIN_ID,
-    PAYMENT_TEXT,
-    TARIFFS,
-    PANEL_URL,
-    API_TOKEN
-)
-
 from database.db import (
     add_user, get_username, save_username,
     get_sub_until, has_sub, has_pending_payment,
@@ -440,11 +431,22 @@ def register_handlers(bot):
             if not tariff:
                 return
 
+            # --- ДОБАВИТЬ: проверить что заявка реально существует ---
+            if not has_pending_payment(user_id):
+                bot.answer_callback_query(call.id, "⚠️ Заявка не найдена или уже обработана", show_alert=True)
+                return
+
+            # --- ДОБАВИТЬ: сверить tariff_id с тем, что в БД ---
+            from database.db import get_pending_payment_info  # см. ниже
+            pending = get_pending_payment_info(user_id)
+            if not pending or pending["tariff_id"] != tariff_id:
+                bot.answer_callback_query(call.id, "⚠️ Тариф не совпадает с заявкой", show_alert=True)
+                return
+
             days = tariff.get("days", 30)
+            payment_type = pending["payment_type"]
 
             from database.db import set_subscription
-            payment_type = get_pending_payment_type(user_id)
-
             set_subscription(user_id, days)
 
             if payment_type == "renew":

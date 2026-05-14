@@ -5,8 +5,9 @@ from database.db import (
     set_subscription, remove_sub, get_pending_payments,
     remove_pending_payment, get_total_users, get_total_subs,
     get_recent_users, get_all_user_ids,
+    has_sub,
 )
-from services.vpn import create_user, delete_user, get_online_users
+from services.vpn import create_user, delete_user, get_online_users, extend_user
 import time
 
 
@@ -131,10 +132,17 @@ def register_admin_handlers(bot):
             return
 
         try:
+            already_active = has_sub(user_id)
             set_subscription(user_id, 30)
-            create_user(user_id, 30)
+
+            if already_active:
+                extend_user(user_id, 30)
+            else:
+                create_user(user_id, 30)
+
             safe_edit(bot, call, f"✅ Выдано {user_id}", back())
             bot.send_message(user_id, "✅ Подписка выдана")
+
         except Exception as e:
             print("GIVE ERROR:", e)
 
