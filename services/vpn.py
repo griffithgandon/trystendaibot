@@ -191,3 +191,64 @@ def get_online_users() -> list[str] | None:
     except Exception as e:
         print("ONLINE ERROR:", e)
         return None
+
+# ===== EXTEND USER =====
+def extend_user(user_id: int, days: int) -> bool:
+    print("EXTEND USER:", user_id)
+
+    data = get_inbounds()
+    if not data:
+        return False
+
+    success = False
+    now_ms = int(time.time() * 1000)
+
+    for inbound in data.get("obj", []):
+        inbound_id = inbound.get("id")
+
+        try:
+            settings = json.loads(inbound.get("settings", "{}"))
+        except Exception:
+            continue
+
+        for client in settings.get("clients", []):
+            email = client.get("email", "")
+
+            if not email.startswith(str(user_id)):
+                continue
+
+            client_uuid = client.get("id")
+            current_expiry = client.get("expiryTime", 0)
+
+            # Прибавляем дни к текущей дате истечения, а не к now
+            new_expiry = (
+                current_expiry + days * 86400 * 1000
+                if current_expiry > now_ms
+                else now_ms + days * 86400 * 1000
+            )
+
+            client["expiryTime"] = new_expiry
+
+            payload = {
+                "id": inbound_id,
+                "settings": json.dumps({"clients": [client]})
+            }
+
+            try:
+                r = session.post(
+                    f"{PANEL_URL}/panel/api/inbounds/updateClient/{client_uuid}",
+                    headers=HEADERS,
+                    json=payload,
+                    verify=False,
+                    timeout=REQUEST_TIMEOUT
+                )
+
+                print("EXTEND STATUS:", r.status_code)
+
+                if r.status_code == 200:
+                    success = True
+
+            except Exception as e:
+                print("EXTEND ERROR:", e)
+
+    return success

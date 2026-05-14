@@ -1,6 +1,16 @@
 from telebot import types
 import time
 import requests
+import json
+from config import (
+    ADMIN_ID,
+    PAYMENT_TEXT,
+    TARIFFS,
+    PANEL_URL,
+    API_TOKEN,
+    SERVERS,  # добавить
+)
+
 
 from config import (
     ADMIN_ID,
@@ -14,9 +24,10 @@ from database.db import (
     add_user, get_username, save_username,
     get_sub_until, has_sub, has_pending_payment,
     add_pending_payment, remove_pending_payment,
-    get_telegram_username,
+    get_telegram_username, get_pending_payment_type,
 )
-from services.vpn import create_user, get_vpn_data
+
+from services.vpn import create_user, get_vpn_data, extend_user
 from utils.qr import generate_qr
 from utils.rate_limiter import rate_limit, payment_limiter, support_limiter, start_limiter
 
@@ -33,6 +44,12 @@ def get_main_menu(user_id: int) -> types.InlineKeyboardMarkup:
         types.InlineKeyboardButton("🔑 Мой VPN", callback_data="token"),
         types.InlineKeyboardButton("💬 Поддержка", callback_data="support")
     )
+
+    if has_sub(user_id):
+        markup.add(
+            types.InlineKeyboardButton("🔄 Продлить", callback_data="renew")
+        )
+
     markup.add(
         types.InlineKeyboardButton("🖥 Статус сервера", callback_data="server_status")
     )
@@ -152,6 +169,137 @@ def register_handlers(bot):
 
         except Exception as e:
             print("PROFILE ERROR:", e)
+
+    # Добавить хендлеры продления внутри register_handlers(bot):
+
+    # ===== RENEW =====
+    @bot.callback_query_handler(func=lambda c: c.data == "renew")
+    def renew(call):
+        if not rate_limit(bot, call):
+            return
+
+        try:
+            bot.answer_callback_query(call.id)
+
+            if not has_sub(call.from_user.id):
+                bot.answer_callback_query(call.id, "❌ Нет активной подписки", show_alert=True)
+                return
+
+            markup = types.InlineKeyboardMarkup(row_width=1)
+
+            for tariff_id, tariff in TARIFFS.items():
+                markup.add(
+                    types.InlineKeyboardButton(
+                        tariff.get("title", "Тариф"),
+                        callback_data=f"renew_tariff_{tariff_id}"
+                    )
+                )
+
+            markup.add(types.InlineKeyboardButton("⬅️ Назад", callback_data="menu"))
+            safe_edit(bot, call, "🔄 Продление подписки\n\nВыбери тариф:", markup)
+
+        except Exception as e:
+            print("RENEW ERROR:", e)
+
+    # ===== RENEW TARIFF =====
+    @bot.callback_query_handler(func=lambda c: c.data.startswith("renew_tariff_"))
+    def renew_tariff(call):
+        if not rate_limit(bot, call):
+            return
+
+        try:
+            bot.answer_callback_query(call.id)
+
+            tariff_id = call.data[len("renew_tariff_"):]
+            tariff = TARIFFS.get(tariff_id)
+            if not tariff:
+                return
+
+            markup = types.InlineKeyboardMarkup(row_width=1)
+            markup.add(
+                types.InlineKeyboardButton("✅ Я оплатил", callback_data=f"renew_paid_{tariff_id}")
+            )
+            markup.add(types.InlineKeyboardButton("⬅️ Назад", callback_data="renew"))
+
+            sub_until = get_sub_until(call.from_user.id)
+            date = time.strftime("%d.%m.%Y", time.localtime(sub_until))
+
+            text = (
+                f"{PAYMENT_TEXT}\n\n"
+                f"🔄 Продление подписки\n"
+                f"📅 Текущая подписка до: {date}\n\n"
+                f"📦 Тариф: {tariff.get('title')}\n"
+                f"💰 Цена: {tariff.get('price')}₽\n"
+                f"📅 Добавится: {tariff.get('days')} дней\n\n"
+                f"🆔 Ваш ID:\n{call.from_user.id}"
+            )
+
+            safe_edit(bot, call, text, markup)
+
+        except Exception as e:
+            print("RENEW TARIFF ERROR:", e)
+
+    # ===== RENEW PAID =====
+    @bot.callback_query_handler(func=lambda c: c.data.startswith("renew_paid_"))
+    def renew_paid(call):
+        if not rate_limit(bot, call, payment_limiter):
+            return
+
+        try:
+            bot.answer_callback_query(call.id)
+
+            tariff_id = call.data[len("renew_paid_"):]
+            tariff = TARIFFS.get(tariff_id)
+            if not tariff:
+                return
+
+            user_id = call.from_user.id
+
+            if has_pending_payment(user_id):
+                bot.answer_callback_query(
+                    call.id,
+                    "⏳ У тебя уже есть активная заявка",
+                    show_alert=True
+                )
+                return
+
+            add_pending_payment(user_id, tariff_id, payment_type="renew")
+
+            username = get_username(user_id) or "Без ника"
+            sub_until = get_sub_until(user_id)
+            date = time.strftime("%d.%m.%Y", time.localtime(sub_until))
+
+            markup = types.InlineKeyboardMarkup()
+            markup.add(
+                types.InlineKeyboardButton(
+                    "✅ Подтвердить продление",
+                    callback_data=f"approve|{user_id}|{tariff_id}"
+                )
+            )
+
+            for admin in ADMIN_ID:
+                try:
+                    bot.send_message(
+                        admin,
+                        f"🔄 Заявка на продление\n\n"
+                        f"👤 {username}\n"
+                        f"🆔 ID: {user_id}\n"
+                        f"📅 Подписка до: {date}\n\n"
+                        f"📦 Тариф: {tariff.get('title')}\n"
+                        f"💰 Сумма: {tariff.get('price')}₽",
+                        reply_markup=markup
+                    )
+                except Exception:
+                    pass
+
+            safe_edit(
+                bot, call,
+                "✅ Заявка на продление отправлена\n\n⏳ Ожидайте подтверждения",
+                back_button()
+            )
+
+        except Exception as e:
+            print("RENEW PAID ERROR:", e)
 
     # ===== BUY =====
     @bot.callback_query_handler(func=lambda c: c.data == "buy")
@@ -274,7 +422,7 @@ def register_handlers(bot):
             print("PAID ERROR:", e)
 
     # ===== APPROVE =====
-    # Используем | как безопасный разделитель
+    # Заменить хендлер approve:
     @bot.callback_query_handler(func=lambda c: c.data.startswith("approve|"))
     def approve(call):
         try:
@@ -295,22 +443,31 @@ def register_handlers(bot):
             days = tariff.get("days", 30)
 
             from database.db import set_subscription
+            payment_type = get_pending_payment_type(user_id)
+
             set_subscription(user_id, days)
-            create_user(user_id, days)
+
+            if payment_type == "renew":
+                extend_user(user_id, days)
+            else:
+                create_user(user_id, days)
+
             remove_pending_payment(user_id)
+
+            type_label = "🔄 Продление" if payment_type == "renew" else "✅ Оплата"
 
             try:
                 bot.send_message(
                     user_id,
-                    f"✅ Оплата подтверждена\n\n"
+                    f"{type_label} подтверждено\n\n"
                     f"📦 Тариф: {tariff.get('title')}\n"
-                    f"📅 Срок: {days} дней\n\n"
-                    f"🔑 VPN активирован"
+                    f"📅 Добавлено: {days} дней\n\n"
+                    f"🔑 VPN {'продлён' if payment_type == 'renew' else 'активирован'}"
                 )
             except Exception:
                 pass
 
-            safe_edit(bot, call, "✅ Оплата подтверждена", back_button())
+            safe_edit(bot, call, f"{type_label} подтверждено", back_button())
             bot.answer_callback_query(call.id, "✅ Готово")
 
         except Exception as e:
@@ -450,36 +607,23 @@ def register_handlers(bot):
         try:
             bot.answer_callback_query(call.id)
 
-            headers = {
-                "Authorization": f"Bearer {API_TOKEN}",
-                "Accept": "application/json"
-            }
+            lines = ["🖥 Статус серверов\n"]
 
-            try:
-                start = time.time()
-                r = requests.get(
-                    f"{PANEL_URL}/panel/api/inbounds/list",
-                    headers=headers,
-                    verify=False,
-                    timeout=5
-                )
-                ping = int((time.time() - start) * 1000)
-                status = "🟢 Онлайн" if r.status_code == 200 else f"🟡 Ошибка ({r.status_code})"
+            for server in SERVERS:
+                name = server["name"]
+                url = server["url"]
 
-            except requests.exceptions.Timeout:
-                status = "🔴 Нет ответа (таймаут)"
-                ping = None
-            except Exception:
-                status = "🔴 Недоступен"
-                ping = None
+                try:
+                    r = requests.get(url, verify=False, timeout=5)
+                    status = "🟢 Онлайн"
+                except requests.exceptions.Timeout:
+                    status = "🔴 Таймаут"
+                except Exception:
+                    status = "🔴 Недоступен"
 
-            ping_text = f"\n⚡️ Пинг: {ping} мс" if ping is not None else ""
+                lines.append(f"{name}\n{status}")
 
-            safe_edit(
-                bot, call,
-                f"🖥 Статус сервера\n\n{status}{ping_text}",
-                back_button()
-            )
+            safe_edit(bot, call, "\n\n".join(lines), back_button())
 
         except Exception as e:
             print("SERVER STATUS ERROR:", e)

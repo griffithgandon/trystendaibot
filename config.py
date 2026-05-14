@@ -125,3 +125,9 @@ print("HYSTERIA_ENABLED:", HYSTERIA_ENABLED)
 print("TARIFFS:", TARIFFS)
 
 print("====================")
+
+# ===== SERVERS =====
+SERVERS = [
+    {"name": os.getenv("SERVER1_NAME", "Сервер 1"), "url": os.getenv("SERVER1_URL", "")},
+    {"name": os.getenv("SERVER2_NAME", "Сервер 2"), "url": os.getenv("SERVER2_URL", "")},
+]

@@ -37,6 +37,15 @@ try:
     print("MIGRATION: added column 'reminded'")
 except Exception:
     pass  # Колонка уже существует — всё ок
+    pass  # Колонка уже существует — всё ок
+    pass  # Колонка уже существует — всё ок
+# После существующей миграции reminded, добавить:
+try:
+    cursor.execute("ALTER TABLE pending_payments ADD COLUMN payment_type TEXT DEFAULT 'new'")
+    conn.commit()
+    print("MIGRATION: added column 'payment_type'")
+except Exception:
+    pass
 
 # ===== PENDING PAYMENTS TABLE =====
 with _lock:
@@ -134,10 +143,10 @@ def get_sub_until(user_id: int) -> int:
 
 
 # ===== PENDING PAYMENTS =====
-def add_pending_payment(user_id: int, tariff_id: str):
+def add_pending_payment(user_id: int, tariff_id: str, payment_type: str = "new"):
     _execute(
-        "INSERT OR REPLACE INTO pending_payments (user_id, tariff_id, created_at) VALUES (?, ?, ?)",
-        (user_id, tariff_id, int(time.time()))
+        "INSERT OR REPLACE INTO pending_payments (user_id, tariff_id, created_at, payment_type) VALUES (?, ?, ?, ?)",
+        (user_id, tariff_id, int(time.time()), payment_type)
     )
 
 
@@ -160,7 +169,7 @@ def remove_pending_payment(user_id: int):
 
 def get_pending_payments() -> list:
     return _fetchall(
-        "SELECT user_id, tariff_id, created_at FROM pending_payments ORDER BY created_at DESC"
+        "SELECT user_id, tariff_id, created_at, payment_type FROM pending_payments ORDER BY created_at DESC"
     )
 
 
@@ -215,3 +224,10 @@ def get_recent_users(limit: int = 20) -> list:
 # ===== ALL USER IDS (для рассылки) =====
 def get_all_user_ids() -> list:
     return _fetchall("SELECT user_id FROM users")
+
+def get_pending_payment_type(user_id: int) -> str:
+    row = _fetchone(
+        "SELECT payment_type FROM pending_payments WHERE user_id=?",
+        (user_id,)
+    )
+    return row[0] if row else "new"

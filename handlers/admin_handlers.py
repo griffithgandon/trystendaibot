@@ -280,12 +280,13 @@ def register_admin_handlers(bot):
         markup = types.InlineKeyboardMarkup()
         text = "💰 Активные заявки\n"
 
-        for user_id, tariff_id, created_at in payments:
+        for user_id, tariff_id, created_at, payment_type in payments:
             username = get_username(user_id) or "Без ника"
-            text += f"\n👤 {username}\n🆔 ID: {user_id}\n"
+            type_label = "🔄 Продление" if payment_type == "renew" else "🆕 Новая"
+            text += f"\n{type_label}\n👤 {username}\n🆔 ID: {user_id}\n"
             markup.add(
                 types.InlineKeyboardButton(
-                    f"👤 {user_id}",
+                    f"{type_label} | {user_id}",
                     callback_data=f"user_{user_id}"
                 )
             )
