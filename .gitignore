@@ -5,3 +5,4 @@ __pycache__/
 .env
 bot.db
 .png
+fix_db.py
