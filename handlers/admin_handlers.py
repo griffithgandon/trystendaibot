@@ -6,8 +6,7 @@ from database.db import (
     remove_pending_payment, get_total_users, get_total_subs,
     get_recent_users, get_all_user_ids,
 )
-from services.vpn import create_user, delete_user
-from utils.rate_limiter import rate_limit
+from services.vpn import create_user, delete_user, get_online_users
 import time
 
 
@@ -32,6 +31,7 @@ def safe_edit(bot, call, text: str, markup=None):
 def admin_menu() -> types.InlineKeyboardMarkup:
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("👥 Пользователи", callback_data="admin_users"))
+    markup.add(types.InlineKeyboardButton("🟢 Онлайн", callback_data="admin_online"))
     markup.add(types.InlineKeyboardButton("💰 Заявки", callback_data="pending_list"))
     markup.add(types.InlineKeyboardButton("📊 Статистика", callback_data="admin_stats"))
     markup.add(types.InlineKeyboardButton("📢 Рассылка", callback_data="admin_broadcast"))
@@ -200,6 +200,70 @@ def register_admin_handlers(bot):
             back()
         )
 
+    # ===== ONLINE =====
+    @bot.callback_query_handler(func=lambda c: c.data == "admin_online")
+    def online(call):
+        if not is_admin(call.from_user.id):
+            return
+        bot.answer_callback_query(call.id)
+
+        print("STEP 1: getting clients")
+        clients = get_online_users()
+        print("STEP 2: clients =", clients)
+
+        if clients is None:
+            safe_edit(bot, call, "❌ Не удалось получить данные с панели", back())
+            return
+
+        if not clients:
+            safe_edit(bot, call, "🟡 Сейчас никого нет онлайн", back())
+            return
+
+        seen = set()
+        lines = []
+        now = int(time.time())
+
+        for email in clients:
+            uid_str = email.split("_")[0]
+            if uid_str in seen:
+                continue
+            seen.add(uid_str)
+            print("STEP 3: processing uid", uid_str)
+
+            try:
+                uid = int(uid_str)
+                print("STEP 4: get_username")
+                username = get_username(uid) or "Без ника"
+                print("STEP 5: get_telegram_username")
+                tg = get_telegram_username(uid) or "—"
+                print("STEP 6: get_sub_until")
+                sub_until = get_sub_until(uid)
+                print("STEP 7: sub_until =", sub_until)
+
+                if sub_until > now:
+                    days_left = (sub_until - now) // 86400
+                    hours_left = ((sub_until - now) % 86400) // 3600
+                    expire_date = time.strftime("%d.%m.%Y", time.localtime(sub_until))
+                    remain = f"{days_left}д {hours_left}ч" if days_left > 0 else f"{hours_left}ч"
+                    sub_info = f"до {expire_date} (осталось {remain})"
+                else:
+                    sub_info = "⚠️ истекла"
+
+                lines.append(f"• {username} | @{tg} | {uid}\n  💎 {sub_info}")
+
+            except ValueError:
+                lines.append(f"• {email}")
+
+        print("STEP 8: building text")
+        text = f"🟢 Онлайн сейчас: {len(seen)}\n\n" + "\n\n".join(lines)
+
+        if len(text) > 4000:
+            text = text[:4000] + "\n…"
+
+        print("STEP 9: safe_edit")
+        safe_edit(bot, call, text, back())
+        print("STEP 10: done")
+
     # ===== PENDING PAYMENTS =====
     @bot.callback_query_handler(func=lambda c: c.data == "pending_list")
     def pending_list(call):
@@ -251,7 +315,6 @@ def register_admin_handlers(bot):
             try:
                 bot.send_message(uid, message.text)
                 sent += 1
-                # Небольшая пауза чтобы не словить flood от Telegram
                 time.sleep(0.05)
             except Exception:
                 failed += 1

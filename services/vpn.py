@@ -165,3 +165,29 @@ def get_vpn_data(user_id: int) -> str | None:
                     return f"{SUB_BASE_URL}/{sub_id}"
 
     return None
+
+# ===== ONLINE USERS =====
+def get_online_users() -> list[str] | None:
+    """
+    Возвращает список email'ов клиентов, активных прямо сейчас.
+    3x-ui: POST /panel/api/inbounds/onlines
+    """
+    try:
+        r = session.post(
+            f"{PANEL_URL}/panel/api/inbounds/onlines",
+            headers=HEADERS,
+            verify=False,
+            timeout=REQUEST_TIMEOUT
+        )
+
+        if r.status_code != 200:
+            print("ONLINE ERROR STATUS:", r.status_code)
+            return None
+
+        data = r.json()
+        # API возвращает {"success": true, "obj": ["email1", "email2", ...]}
+        return data.get("obj") or []
+
+    except Exception as e:
+        print("ONLINE ERROR:", e)
+        return None
