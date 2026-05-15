@@ -37,7 +37,9 @@ DB_PATH = os.getenv("DB_PATH", "database/bot.db")
 PANEL_URL = os.getenv("PANEL_URL", "")
 API_TOKEN = os.getenv("API_TOKEN", "")
 
-INBOUND_IDS = get_list("INBOUND_IDS")
+# VLESS_INBOUND_IDS — список через запятую, например: 1,2,3,9,10,11
+VLESS_INBOUND_IDS = get_list("VLESS_INBOUND_IDS")
+HYSTERIA_INBOUND_ID = int(os.getenv("HYSTERIA_INBOUND_ID", "0"))
 
 
 # ===== SUB =====
@@ -64,20 +66,18 @@ TARIFFS = {
         "days": 30,
         "price": 150
     },
-
     "2": {
         "title": "90 дней — 450₽",
         "days": 90,
         "price": 450
     },
-
     "3": {
         "title": "180 дней — 900₽",
         "days": 180,
         "price": 900
     },
     "4": {
-        "title": "360 дней — 1500",
+        "title": "360 дней — 1500₽",
         "days": 360,
         "price": 1500
     }
@@ -88,14 +88,8 @@ TARIFFS = {
 SBP_NUMBER = os.getenv("SBP_NUMBER", "")
 CARD_NUMBER = os.getenv("CARD_NUMBER", "")
 
-ADMIN_USERNAMES = os.getenv(
-    "ADMIN_USERNAMES",
-    ""
-).split(",")
-
-admins = "\n".join(
-    [f"@{x}" for x in ADMIN_USERNAMES]
-)
+ADMIN_USERNAMES = os.getenv("ADMIN_USERNAMES", "").split(",")
+admins = "\n".join([f"@{x.strip()}" for x in ADMIN_USERNAMES if x.strip()])
 
 PAYMENT_TEXT = f"""
 💳 Оплата VPN
@@ -110,7 +104,7 @@ PAYMENT_TEXT = f"""
 💳 Карта:
 {CARD_NUMBER}
 
-перед оплатой напишите одному из Админов 👉 {admins}
+Перед оплатой напишите одному из админов 👉 {admins}
 
 📝 В комментарии к переводу укажите свой Telegram ID
 """
@@ -122,20 +116,16 @@ SUPPORT_USERNAME = os.getenv("SUPPORT_USERNAME", "@support")
 
 # ===== DEBUG =====
 print("=== CONFIG CHECK ===")
-
 print("PANEL_URL:", PANEL_URL)
 print("API_TOKEN:", bool(API_TOKEN))
-
-print("INBOUND_IDS:", INBOUND_IDS)
-
+print("VLESS_INBOUND_IDS:", VLESS_INBOUND_IDS)
+print("HYSTERIA_INBOUND_ID:", HYSTERIA_INBOUND_ID)
 print("DOMAIN:", DOMAIN)
 print("SUB_BASE_URL:", SUB_BASE_URL)
-
 print("HYSTERIA_ENABLED:", HYSTERIA_ENABLED)
-
 print("TARIFFS:", TARIFFS)
-
 print("====================")
+
 
 # ===== SERVERS =====
 SERVERS = [
@@ -146,11 +136,9 @@ SERVERS = [
 # ===== TLS =====
 PANEL_VERIFY = os.getenv("PANEL_VERIFY", "true")
 
-# Если "false" — отключить проверку (только для разработки).
-# Иначе трактуем как путь к CA-сертификату или True (системные CA).
 if PANEL_VERIFY.lower() == "false":
     SSL_VERIFY = False
 elif PANEL_VERIFY.lower() == "true":
     SSL_VERIFY = True
 else:
-    SSL_VERIFY = PANEL_VERIFY  # путь к файлу, например "/etc/ssl/certs/panel.crt"
+    SSL_VERIFY = PANEL_VERIFY  # путь к CA-файлу, например "/etc/ssl/certs/panel.crt"
