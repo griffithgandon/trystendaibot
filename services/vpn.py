@@ -130,6 +130,7 @@ def create_user(user_id: int, days: int) -> bool:
                     "expiryTime": expire,
                     "limitIp":  1,
                     "totalGB":  0,
+                    "subId":    sub_id,   # тот же sub_id что и у VLESS — единая подписка
                     "comment":  username
                 }
                 clients.append(new_client)
@@ -346,24 +347,49 @@ def extend_user(user_id: int, days: int) -> bool:
             client["expiryTime"] = new_expiry
 
             if protocol in ("hysteria2", "hysteria"):
-                # Hysteria2: updateClient не работает — обновляем весь inbound
-                settings["clients"] = [
-                    c if c.get("email") != email else client
-                    for c in settings.get("clients", [])
-                ]
-                inbound["settings"] = json.dumps(settings)
-
+                # Hysteria2: updateClient не работает.
+                # Делаем отдельный GET чтобы получить полные данные (включая subId),
+                # обновляем expiryTime и записываем весь inbound обратно.
                 try:
-                    r = session.post(
-                        f"{PANEL_URL}/panel/api/inbounds/update/{inbound_id}",
+                    r_get = session.get(
+                        f"{PANEL_URL}/panel/api/inbounds/get/{inbound_id}",
                         headers=HEADERS,
-                        json=inbound,
                         verify=SSL_VERIFY,
                         timeout=REQUEST_TIMEOUT
                     )
-                    print(f"EXTEND HY2 [{inbound_id}] STATUS:", r.status_code, r.text)
+                    if r_get.status_code != 200 or not r_get.json().get("success"):
+                        print(f"EXTEND HY2 GET [{inbound_id}] ERROR:", r_get.text)
+                        continue
 
-                    if r.status_code == 200 and r.json().get("success"):
+                    full_inbound = r_get.json()["obj"]
+                    full_settings = json.loads(full_inbound.get("settings", "{}"))
+
+                    updated = False
+                    for c in full_settings.get("clients", []):
+                        if c.get("email", "").startswith(str(user_id)):
+                            cur = c.get("expiryTime", 0)
+                            c["expiryTime"] = (
+                                cur + days * 86400 * 1000
+                                if cur > now_ms
+                                else now_ms + days * 86400 * 1000
+                            )
+                            updated = True
+
+                    if not updated:
+                        continue
+
+                    full_inbound["settings"] = json.dumps(full_settings)
+
+                    r_upd = session.post(
+                        f"{PANEL_URL}/panel/api/inbounds/update/{inbound_id}",
+                        headers=HEADERS,
+                        json=full_inbound,
+                        verify=SSL_VERIFY,
+                        timeout=REQUEST_TIMEOUT
+                    )
+                    print(f"EXTEND HY2 [{inbound_id}] STATUS:", r_upd.status_code, r_upd.text)
+
+                    if r_upd.status_code == 200 and r_upd.json().get("success"):
                         success = True
 
                 except Exception as e:
