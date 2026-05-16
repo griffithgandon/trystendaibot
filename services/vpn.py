@@ -171,45 +171,91 @@ def delete_user(user_id: int) -> bool:
         inbound_id = inbound.get("id")
         protocol = inbound.get("protocol", "").lower()
 
-        try:
-            settings = json.loads(inbound.get("settings", "{}"))
-        except Exception as e:
-            print("SETTINGS JSON ERROR:", e)
-            continue
-
-        for client in settings.get("clients", []):
-            email = client.get("email", "")
-
-            if not email.startswith(str(user_id)):
-                continue
-
-            print("FOUND:", email)
-
-            # VLESS/VMess используют "id", Hysteria2 — "password" как идентификатор
-            if protocol in ("hysteria2", "hysteria"):
-                # 3x-ui принимает password клиента как client_id для hysteria2
-                client_id = client.get("password")
-            else:
-                client_id = client.get("id")
-
-            if not client_id:
-                print("SKIP: no client_id for", email)
-                continue
-
+        if protocol in ("hysteria2", "hysteria"):
+            # delClient не работает для hysteria2.
+            # Всегда делаем отдельный GET — list может не содержать клиентов в settings.
             try:
-                r = session.post(
-                    f"{PANEL_URL}/panel/api/inbounds/{inbound_id}/delClient/{client_id}",
+                r_get = session.get(
+                    f"{PANEL_URL}/panel/api/inbounds/get/{inbound_id}",
                     headers=HEADERS,
                     verify=SSL_VERIFY,
                     timeout=REQUEST_TIMEOUT
                 )
-                print("DELETE STATUS:", r.status_code, r.text)
+                print(f"DELETE HY2 GET [{inbound_id}] STATUS:", r_get.status_code)
 
-                if r.status_code == 200:
+                if r_get.status_code != 200 or not r_get.json().get("success"):
+                    print(f"DELETE HY2 GET [{inbound_id}] ERROR:", r_get.text)
+                    continue
+
+                full_inbound = r_get.json()["obj"]
+                full_settings = json.loads(full_inbound.get("settings", "{}"))
+
+                clients_before = full_settings.get("clients", [])
+                clients_after = [
+                    c for c in clients_before
+                    if not c.get("email", "").startswith(str(user_id))
+                ]
+
+                removed = len(clients_before) - len(clients_after)
+                print(f"DELETE HY2 [{inbound_id}]: найдено клиентов={len(clients_before)}, убрано={removed}")
+
+                if removed == 0:
+                    continue  # этого пользователя нет в inbound — пропускаем
+
+                full_settings["clients"] = clients_after
+                full_inbound["settings"] = json.dumps(full_settings)
+
+                r_upd = session.post(
+                    f"{PANEL_URL}/panel/api/inbounds/update/{inbound_id}",
+                    headers=HEADERS,
+                    json=full_inbound,
+                    verify=SSL_VERIFY,
+                    timeout=REQUEST_TIMEOUT
+                )
+                print(f"DELETE HY2 UPDATE [{inbound_id}] STATUS:", r_upd.status_code, r_upd.text)
+
+                if r_upd.status_code == 200 and r_upd.json().get("success"):
                     success = True
 
             except Exception as e:
-                print("DELETE ERROR:", e)
+                print(f"DELETE HY2 [{inbound_id}] ERROR:", e)
+
+        else:
+            # VLESS/VMess: стандартный delClient
+            try:
+                settings = json.loads(inbound.get("settings", "{}"))
+            except Exception as e:
+                print("SETTINGS JSON ERROR:", e)
+                continue
+
+            clients = settings.get("clients", [])
+            target = [c for c in clients if c.get("email", "").startswith(str(user_id))]
+
+            if not target:
+                continue
+
+            for client in target:
+                client_id = client.get("id")
+                print("FOUND:", client.get("email"), "client_id:", client_id)
+
+                if not client_id:
+                    print("SKIP: no client_id for", client.get("email"))
+                    continue
+
+                try:
+                    r = session.post(
+                        f"{PANEL_URL}/panel/api/inbounds/{inbound_id}/delClient/{client_id}",
+                        headers=HEADERS,
+                        verify=SSL_VERIFY,
+                        timeout=REQUEST_TIMEOUT
+                    )
+                    print(f"DELETE VLESS [{inbound_id}] STATUS:", r.status_code, r.text)
+
+                    if r.status_code == 200 and r.json().get("success"):
+                        success = True
+
+                except Exception as e:
+                    print(f"DELETE VLESS [{inbound_id}] ERROR:", e)
 
     return success
 
