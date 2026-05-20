@@ -112,7 +112,7 @@ PAYMENT_TEXT = f"""
 
 # ===== TRIAL PERIOD =====
 # Количество дней пробного периода
-TRIAL_DAYS = get_int("TRIAL_DAYS", 3)
+TRIAL_DAYS = get_int("TRIAL_DAYS", 7)
 
 # True  — пробный выдаётся сразу без подтверждения админа
 # False — требует ручного подтверждения (как обычные платежи)
