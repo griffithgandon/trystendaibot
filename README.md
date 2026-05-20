@@ -103,21 +103,20 @@ The bot automatically creates:
 # Project Structure
 
 ```text
-handlers/
-    user_handlers.py
-    admin_handlers.py
-
 database/
     db.py
-
+handlers/
+    admin_handlers.py
+    user_handlers.py
 services/
+    sub_checker.py
     vpn.py
-
 utils/
+    error_handler.py
     qr.py
-
-main.py
+    rate_limiter.py
 config.py
+main.py
 ```
 
 ---
