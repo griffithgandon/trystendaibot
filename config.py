@@ -110,6 +110,15 @@ PAYMENT_TEXT = f"""
 """
 
 
+# ===== TRIAL PERIOD =====
+# Количество дней пробного периода
+TRIAL_DAYS = get_int("TRIAL_DAYS", 3)
+
+# True  — пробный выдаётся сразу без подтверждения админа
+# False — требует ручного подтверждения (как обычные платежи)
+TRIAL_AUTO_APPROVE = get_bool("TRIAL_AUTO_APPROVE", False)
+
+
 # ===== SUPPORT =====
 SUPPORT_USERNAME = os.getenv("SUPPORT_USERNAME", "@support")
 
@@ -124,6 +133,8 @@ print("DOMAIN:", DOMAIN)
 print("SUB_BASE_URL:", SUB_BASE_URL)
 print("HYSTERIA_ENABLED:", HYSTERIA_ENABLED)
 print("TARIFFS:", TARIFFS)
+print("TRIAL_DAYS:", TRIAL_DAYS)
+print("TRIAL_AUTO_APPROVE:", TRIAL_AUTO_APPROVE)
 print("====================")
 
 

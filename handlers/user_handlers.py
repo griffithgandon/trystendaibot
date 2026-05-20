@@ -9,7 +9,9 @@ from config import (
     TARIFFS,
     PANEL_URL,
     API_TOKEN,
-    SERVERS,  # добавить
+    SERVERS,
+    TRIAL_DAYS,
+    TRIAL_AUTO_APPROVE,
 )
 
 from database.db import (
@@ -17,8 +19,10 @@ from database.db import (
     get_sub_until, has_sub, has_pending_payment,
     add_pending_payment, remove_pending_payment,
     get_telegram_username, get_pending_payment_type,
+    has_used_trial, set_trial_used, is_sub_disabled,
 )
 
+from database.db import set_sub_disabled
 from services.vpn import create_user, get_vpn_data, extend_user
 from utils.qr import generate_qr
 from utils.rate_limiter import rate_limit, payment_limiter, support_limiter, start_limiter
@@ -37,7 +41,7 @@ def get_main_menu(user_id: int) -> types.InlineKeyboardMarkup:
         types.InlineKeyboardButton("💬 Поддержка", callback_data="support")
     )
 
-    if has_sub(user_id):
+    if has_sub(user_id) or is_sub_disabled(user_id):
         markup.add(
             types.InlineKeyboardButton("🔄 Продлить", callback_data="renew")
         )
@@ -107,7 +111,6 @@ def register_handlers(bot):
             user_id = message.from_user.id
             username = message.text.strip()
 
-            # Валидация длины и содержимого
             if len(username) < 2 or len(username) > 32:
                 msg = bot.send_message(
                     message.chat.id,
@@ -146,23 +149,178 @@ def register_handlers(bot):
             user_id = call.from_user.id
             username = get_username(user_id) or "—"
             sub_until = get_sub_until(user_id)
+            trial_status = "✅ Использован" if has_used_trial(user_id) else "🎁 Доступен"
 
             if sub_until > int(time.time()):
                 date = time.strftime("%d.%m.%Y %H:%M", time.localtime(sub_until))
                 status = f"✅ До {date}"
+            elif is_sub_disabled(user_id):
+                status = "⏸ Отключена — продлите для восстановления"
             else:
                 status = "❌ Нет"
 
             safe_edit(
                 bot, call,
-                f"👤 Профиль\n\n🆔 ID: {user_id}\n👤 Ник: {username}\n💎 Подписка: {status}",
+                f"👤 Профиль\n\n"
+                f"🆔 ID: {user_id}\n"
+                f"👤 Ник: {username}\n"
+                f"💎 Подписка: {status}\n"
+                f"🎁 Пробный период: {trial_status}",
                 back_button()
             )
 
         except Exception as e:
             print("PROFILE ERROR:", e)
 
-    # Добавить хендлеры продления внутри register_handlers(bot):
+    # ===== BUY =====
+    @bot.callback_query_handler(func=lambda c: c.data == "buy")
+    @bot.callback_query_handler(func=lambda c: c.data == "buy")
+    def buy(call):
+        if not rate_limit(bot, call):
+            return
+
+        try:
+            bot.answer_callback_query(call.id)
+            user_id = call.from_user.id
+
+            if has_sub(user_id):
+                sub_until = get_sub_until(user_id)
+                date = time.strftime("%d.%m.%Y", time.localtime(sub_until))
+                bot.answer_callback_query(
+                    call.id,
+                    f"✅ У вас уже есть активная подписка до {date}\n\nДля продления используйте кнопку 🔄 Продлить",
+                    show_alert=True
+                )
+                return
+
+            markup = types.InlineKeyboardMarkup(row_width=1)
+
+            # Кнопка пробного периода — только если ещё не использован и нет активной подписки
+            if not has_used_trial(user_id) and not has_sub(user_id):
+                markup.add(
+                    types.InlineKeyboardButton(
+                        f"🎁 Пробный период — {TRIAL_DAYS} дней бесплатно",
+                        callback_data="trial_request"
+                    )
+                )
+
+            for tariff_id, tariff in TARIFFS.items():
+                markup.add(
+                    types.InlineKeyboardButton(
+                        tariff.get("title", "Тариф"),
+                        callback_data=f"tariff_{tariff_id}"
+                    )
+                )
+
+            markup.add(types.InlineKeyboardButton("⬅️ Назад", callback_data="menu"))
+            safe_edit(bot, call, "💎 Выбери тариф:", markup)
+
+        except Exception as e:
+            print("BUY ERROR:", e)
+
+    # ===== TRIAL REQUEST =====
+    @bot.callback_query_handler(func=lambda c: c.data == "trial_request")
+    def trial_request(call):
+        if not rate_limit(bot, call, payment_limiter):
+            return
+
+        try:
+            bot.answer_callback_query(call.id)
+            user_id = call.from_user.id
+
+            # Двойная проверка (кнопка могла остаться в кэше)
+            if has_used_trial(user_id):
+                bot.answer_callback_query(
+                    call.id,
+                    "❌ Пробный период уже был использован",
+                    show_alert=True
+                )
+                return
+
+            if has_sub(user_id):
+                bot.answer_callback_query(
+                    call.id,
+                    "❌ У вас уже есть активная подписка",
+                    show_alert=True
+                )
+                return
+
+            if has_pending_payment(user_id):
+                bot.answer_callback_query(
+                    call.id,
+                    "⏳ У тебя уже есть активная заявка",
+                    show_alert=True
+                )
+                return
+
+            username = get_username(user_id) or "Без ника"
+
+            # ── Авто-выдача ───────────────────────────────────────────────────
+            if TRIAL_AUTO_APPROVE:
+                from database.db import set_subscription
+                set_subscription(user_id, TRIAL_DAYS)
+                set_trial_used(user_id)
+                create_user(user_id, TRIAL_DAYS)
+
+                safe_edit(
+                    bot, call,
+                    f"🎁 Пробный период активирован!\n\n"
+                    f"📅 Длительность: {TRIAL_DAYS} дней\n\n"
+                    f"Нажми 🔑 Мой VPN чтобы получить конфиг.",
+                    back_button()
+                )
+
+                # Уведомляем админов
+                for admin in ADMIN_ID:
+                    try:
+                        bot.send_message(
+                            admin,
+                            f"🎁 Пробный период выдан автоматически\n\n"
+                            f"👤 {username}\n"
+                            f"🆔 ID: {user_id}\n"
+                            f"📅 Дней: {TRIAL_DAYS}"
+                        )
+                    except Exception:
+                        pass
+
+            # ── Ручное подтверждение ──────────────────────────────────────────
+            else:
+                add_pending_payment(user_id, "trial", payment_type="trial")
+
+                markup = types.InlineKeyboardMarkup()
+                markup.add(
+                    types.InlineKeyboardButton(
+                        "✅ Одобрить пробный период",
+                        callback_data=f"approve_trial|{user_id}"
+                    ),
+                    types.InlineKeyboardButton(
+                        "❌ Отклонить",
+                        callback_data=f"decline_trial|{user_id}"
+                    )
+                )
+
+                for admin in ADMIN_ID:
+                    try:
+                        bot.send_message(
+                            admin,
+                            f"🎁 Заявка на пробный период\n\n"
+                            f"👤 {username}\n"
+                            f"🆔 ID: {user_id}\n"
+                            f"📅 Дней: {TRIAL_DAYS}",
+                            reply_markup=markup
+                        )
+                    except Exception:
+                        pass
+
+                safe_edit(
+                    bot, call,
+                    "🎁 Заявка на пробный период отправлена\n\n"
+                    "⏳ Ожидайте подтверждения от администратора",
+                    back_button()
+                )
+
+        except Exception as e:
+            print("TRIAL REQUEST ERROR:", e)
 
     # ===== RENEW =====
     @bot.callback_query_handler(func=lambda c: c.data == "renew")
@@ -173,7 +331,7 @@ def register_handlers(bot):
         try:
             bot.answer_callback_query(call.id)
 
-            if not has_sub(call.from_user.id):
+            if not has_sub(call.from_user.id) and not is_sub_disabled(call.from_user.id):
                 bot.answer_callback_query(call.id, "❌ Нет активной подписки", show_alert=True)
                 return
 
@@ -293,30 +451,6 @@ def register_handlers(bot):
         except Exception as e:
             print("RENEW PAID ERROR:", e)
 
-    # ===== BUY =====
-    @bot.callback_query_handler(func=lambda c: c.data == "buy")
-    def buy(call):
-        if not rate_limit(bot, call):
-            return
-
-        try:
-            bot.answer_callback_query(call.id)
-            markup = types.InlineKeyboardMarkup(row_width=1)
-
-            for tariff_id, tariff in TARIFFS.items():
-                markup.add(
-                    types.InlineKeyboardButton(
-                        tariff.get("title", "Тариф"),
-                        callback_data=f"tariff_{tariff_id}"
-                    )
-                )
-
-            markup.add(types.InlineKeyboardButton("⬅️ Назад", callback_data="menu"))
-            safe_edit(bot, call, "💎 Выбери тариф:", markup)
-
-        except Exception as e:
-            print("BUY ERROR:", e)
-
     # ===== TARIFF =====
     @bot.callback_query_handler(func=lambda c: c.data.startswith("tariff_"))
     def tariff(call):
@@ -326,7 +460,6 @@ def register_handlers(bot):
         try:
             bot.answer_callback_query(call.id)
 
-            # Безопасный парсинг: берём только первую часть после "tariff_"
             tariff_id = call.data[len("tariff_"):]
 
             tariff = TARIFFS.get(tariff_id)
@@ -355,7 +488,6 @@ def register_handlers(bot):
     # ===== PAID =====
     @bot.callback_query_handler(func=lambda c: c.data.startswith("paid_"))
     def paid(call):
-        # Строгий лимит на платёжные заявки
         if not rate_limit(bot, call, payment_limiter):
             return
 
@@ -382,7 +514,6 @@ def register_handlers(bot):
             username = get_username(user_id) or "Без ника"
 
             markup = types.InlineKeyboardMarkup()
-            # Используем | как разделитель вместо _ чтобы tariff_id не ломал split
             markup.add(
                 types.InlineKeyboardButton(
                     "✅ Подтвердить",
@@ -414,7 +545,6 @@ def register_handlers(bot):
             print("PAID ERROR:", e)
 
     # ===== APPROVE =====
-    # Заменить хендлер approve:
     @bot.callback_query_handler(func=lambda c: c.data.startswith("approve|"))
     def approve(call):
         try:
@@ -432,13 +562,11 @@ def register_handlers(bot):
             if not tariff:
                 return
 
-            # --- ДОБАВИТЬ: проверить что заявка реально существует ---
             if not has_pending_payment(user_id):
                 bot.answer_callback_query(call.id, "⚠️ Заявка не найдена или уже обработана", show_alert=True)
                 return
 
-            # --- ДОБАВИТЬ: сверить tariff_id с тем, что в БД ---
-            from database.db import get_pending_payment_info  # см. ниже
+            from database.db import get_pending_payment_info, set_subscription
             pending = get_pending_payment_info(user_id)
             if not pending or pending["tariff_id"] != tariff_id:
                 bot.answer_callback_query(call.id, "⚠️ Тариф не совпадает с заявкой", show_alert=True)
@@ -447,13 +575,14 @@ def register_handlers(bot):
             days = tariff.get("days", 30)
             payment_type = pending["payment_type"]
 
-            from database.db import set_subscription
             set_subscription(user_id, days)
 
             if payment_type == "renew":
                 extend_user(user_id, days)
+                set_sub_disabled(user_id, False)
             else:
                 create_user(user_id, days)
+                set_sub_disabled(user_id, False)
 
             remove_pending_payment(user_id)
 
@@ -495,7 +624,6 @@ def register_handlers(bot):
 
     # ===== SEND SUPPORT =====
     def send_support(message):
-        # Ограничение длины сообщения
         if not rate_limit(bot, message, support_limiter):
             return
 
@@ -507,7 +635,6 @@ def register_handlers(bot):
                 bot.send_message(message.chat.id, "❌ Пустое сообщение")
                 return
 
-            # Обрезаем слишком длинные сообщения
             if len(text) > 1000:
                 text = text[:1000] + "...\n[обрезано]"
 
@@ -585,7 +712,11 @@ def register_handlers(bot):
             user_id = call.from_user.id
 
             if not has_sub(user_id):
-                bot.answer_callback_query(call.id, "❌ Нет подписки", show_alert=True)
+                if is_sub_disabled(user_id):
+                    bot.answer_callback_query(call.id, "⏸ Подписка отключена — продлите для восстановления",
+                                              show_alert=True)
+                else:
+                    bot.answer_callback_query(call.id, "❌ Нет подписки", show_alert=True)
                 return
 
             sub = get_vpn_data(user_id)

@@ -25,7 +25,8 @@ with _lock:
         username TEXT,
         telegram_username TEXT,
         sub_until INTEGER DEFAULT 0,
-        reminded INTEGER DEFAULT 0
+        reminded INTEGER DEFAULT 0,
+        trial_used INTEGER DEFAULT 0
     )
     """)
     conn.commit()
@@ -49,6 +50,20 @@ try:
     print("MIGRATION: added column 'reminded'")
 except Exception:
     pass  # колонка уже существует
+
+try:
+    cursor.execute("ALTER TABLE users ADD COLUMN trial_used INTEGER DEFAULT 0")
+    conn.commit()
+    print("MIGRATION: added column 'trial_used'")
+except Exception:
+    pass  # колонка уже существует
+
+try:
+    cursor.execute("ALTER TABLE users ADD COLUMN sub_disabled INTEGER DEFAULT 0")
+    conn.commit()
+    print("MIGRATION: added column 'sub_disabled'")
+except Exception:
+    pass
 
 
 # ── Хелпер ───────────────────────────────────────────────────────────────────
@@ -126,7 +141,7 @@ def has_sub(user_id: int) -> bool:
 
 
 def remove_sub(user_id: int):
-    _execute("UPDATE users SET sub_until=0 WHERE user_id=?", (user_id,))
+    _execute("UPDATE users SET sub_until=0, sub_disabled=0 WHERE user_id=?", (user_id,))
 
 
 def get_sub_until(user_id: int) -> int:
@@ -144,7 +159,7 @@ def add_pending_payment(user_id: int, tariff_id: str, payment_type: str = "new")
 
 def clear_old_pending():
     _execute(
-        "DELETE FROM pending_payments WHERE created_at < ?",
+        "DELETE FROM pending_payments WHERE created_at < ? AND payment_type != 'trial'",
         (int(time.time()) - 1800,)
     )
 
@@ -161,7 +176,16 @@ def remove_pending_payment(user_id: int):
 
 def get_pending_payments() -> list:
     return _fetchall(
-        "SELECT user_id, tariff_id, created_at, payment_type FROM pending_payments ORDER BY created_at DESC"
+        "SELECT user_id, tariff_id, created_at, payment_type FROM pending_payments "
+        "WHERE payment_type != 'trial' ORDER BY created_at DESC"
+    )
+
+
+def get_pending_trials() -> list:
+    """Заявки на пробный период."""
+    return _fetchall(
+        "SELECT user_id, tariff_id, created_at FROM pending_payments "
+        "WHERE payment_type='trial' ORDER BY created_at DESC"
     )
 
 
@@ -217,12 +241,14 @@ def get_recent_users(limit: int = 20) -> list:
 def get_all_user_ids() -> list:
     return _fetchall("SELECT user_id FROM users")
 
+
 def get_pending_payment_type(user_id: int) -> str:
     row = _fetchone(
         "SELECT payment_type FROM pending_payments WHERE user_id=?",
         (user_id,)
     )
     return row[0] if row else "new"
+
 
 def get_pending_payment_info(user_id: int) -> dict | None:
     """Возвращает словарь {tariff_id, payment_type} или None."""
@@ -233,3 +259,32 @@ def get_pending_payment_info(user_id: int) -> dict | None:
     if not row:
         return None
     return {"tariff_id": row[0], "payment_type": row[1]}
+
+
+# ===== TRIAL PERIOD =====
+def has_used_trial(user_id: int) -> bool:
+    """Проверяет, использовал ли пользователь пробный период."""
+    row = _fetchone("SELECT trial_used FROM users WHERE user_id=?", (user_id,))
+    return bool(row and row[0])
+
+
+def set_trial_used(user_id: int):
+    """Помечает пробный период как использованный."""
+    _execute("UPDATE users SET trial_used=1 WHERE user_id=?", (user_id,))
+
+
+def get_total_trials() -> int:
+    """Количество пользователей, использовавших пробный период."""
+    row = _fetchone("SELECT COUNT(*) FROM users WHERE trial_used=1")
+    return row[0] if row else 0
+
+# ===== DISABLED STATUS =====
+def is_sub_disabled(user_id: int) -> bool:
+    row = _fetchone("SELECT sub_disabled FROM users WHERE user_id=?", (user_id,))
+    return bool(row and row[0])
+
+def set_sub_disabled(user_id: int, disabled: bool):
+    _execute(
+        "UPDATE users SET sub_disabled=? WHERE user_id=?",
+        (1 if disabled else 0, user_id)
+    )

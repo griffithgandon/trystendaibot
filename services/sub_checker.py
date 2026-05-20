@@ -4,8 +4,9 @@ from database.db import (
     mark_reminded,
     get_expired_users,
     remove_sub,
+    set_sub_disabled,
 )
-from services.vpn import delete_user
+from services.vpn import disable_user
 
 
 def check_subscriptions(bot):
@@ -20,7 +21,6 @@ def check_subscriptions(bot):
                 "💎 Продли VPN заранее, чтобы не потерять доступ."
             )
 
-            # Помечаем — больше не напоминаем до следующей подписки
             mark_reminded(user_id)
 
         except Exception as e:
@@ -29,16 +29,17 @@ def check_subscriptions(bot):
     # ===== Подписка истекла =====
     for (user_id,) in get_expired_users():
 
-        # 1. Удаляем конфиг с VPN-панели
+        # 1. Отключаем клиента на панели (не удаляем)
         try:
-            deleted = delete_user(user_id)
-            print(f"VPN DELETE user={user_id} success={deleted}")
+            disabled = disable_user(user_id)
+            print(f"VPN DISABLE user={user_id} success={disabled}")
         except Exception as e:
-            print(f"VPN DELETE ERROR user={user_id}:", e)
+            print(f"VPN DISABLE ERROR user={user_id}:", e)
 
-        # 2. Обнуляем подписку в БД
+        # 2. Обнуляем подписку и ставим флаг disabled в БД
         try:
             remove_sub(user_id)
+            set_sub_disabled(user_id, True)
         except Exception as e:
             print(f"SUB RESET ERROR user={user_id}:", e)
 
