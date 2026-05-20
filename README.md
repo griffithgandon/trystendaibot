@@ -12,8 +12,6 @@ Telegram VPN bot with:
 - Statistics
 - SQLite database
 
----
-
 # Features
 
 ## User Features
@@ -25,8 +23,6 @@ Telegram VPN bot with:
 - VPN config retrieval
 - QR-code generation
 - Built-in support chat
-
----
 
 ## Admin Features
 
@@ -40,98 +36,133 @@ Telegram VPN bot with:
 - User statistics
 - Telegram username display
 
----
-
 # Tech Stack
 
 - Python
 - pyTelegramBotAPI
 - SQLite
-- WireGuard / VPN API
+- 3X-UI API
 
----
+# Установка
 
-# Installation
-
-## Clone repository
+## Клонировать репозиторий
 
 ```bash
-git clone https://github.com/USERNAME/REPOSITORY.git
+git clone https://github.com/griffithgandon/trystendaibot
 cd REPOSITORY
 ```
 
----
-
-## Install dependencies
+## Установить зависимости
 
 ```bash
 pip install -r requirements.txt
 ```
 
----
+## Настройка конфигурационного файла
 
-## Configure bot
+Настройка конфига производится в `config.py`
 
-Edit `config.py`
+## Конфигурация секретов в .env
 
-```python
-BOT_TOKEN = "TOKEN"
-ADMIN_ID = [123456789]
+Без секретов бот работать не будет. Этого файла нет в репозитории по понятным причинам, из за чего требуется вручную создать его и настроить по примеру снизу.
+```text
+BOT_TOKEN = "BOT_TOKEN" - токен бота из BotFather, с кавычками
 
-DB_PATH = "database/bot.db"
+ADMIN_ID=000000,000000 - телеграм ID администраторов
+
+DB_PATH=database/bot.db - путь к базе данных. На данный момент можно не трогать
+
+PANEL_URL=https://domain.com:port/panel_url - полный url к панели
+
+DOMAIN=domain.com - ваш домен, при наличии такового
+
+ADMIN_USERNAMES=Null - Юзернеймы администраторов из телеграма через запятую
+
+PANEL_VERIFY=true
+
+HYSTERIA_ENABLED=true
+
+# ВАЖНО — без / в конце
+SUB_BASE_URL=https://domain.com:port/sub_url
+
+PORT=443
+
+API_TOKEN=token - Апи токен панели.
+
+# ===== ПРОТОКОЛЫ =====
+VLESS_INBOUND_IDS=
+HYSTERIA_INBOUND_ID=
+
+# ===== PAYMENT =====
+SBP_NUMBER=+79999999999
+CARD_NUMBER=2200000000000000
+
+# тарифы
+TARIFF_1_TITLE=30 дней
+TARIFF_1_PRICE=150
+TARIFF_1_DAYS=30
+
+TARIFF_2_TITLE=90 дней
+TARIFF_2_PRICE=450
+TARIFF_2_DAYS=90
+
+TARIFF_3_TITLE=180 дней
+TARIFF_3_PRICE=900
+TARIFF_3_DAYS=180
+
+TARIFF_4_TITLE=360 дней
+TARIFF_4_PRICE=1500
+TARIFF_4_DAYS=365
+
+SERVER1_NAME=
+SERVER1_URL=
+
+SERVER2_NAME=
+SERVER2_URL=
 ```
-
----
-
 ## Run bot
 
 ```bash
 python main.py
 ```
 
----
+# База данных
 
-# Database
+Бот автоматически создает следующие таблицы:
+- users
+- pending_payments
 
-The bot automatically creates:
-
-- users table
-- pending_payments table
-
----
-
-# Project Structure
+# Структура проекта
 
 ```text
 database/
     db.py
+    
 handlers/
     admin_handlers.py
     user_handlers.py
+
 services/
     sub_checker.py
     vpn.py
+    
 utils/
     error_handler.py
     qr.py
     rate_limiter.py
+    
 config.py
 main.py
 ```
 
----
+# Потенциальное развитие проекта
 
-# TODO
-
-- Auto-renew subscriptions
-- Payment gateway integration
-- Trial subscriptions
-- Referral system
-- Multi-admin roles
-- PostgreSQL support
-- Backup system
-
----
+- Авто-продление подписок;
+- Интеграция платежного шлюза;
+- ~~Пробные подписки;~~ - Добавлено
+- Реферальная система;
+- Поддержка PostgreSQL;
+- Система резервных копий.
 
 # License
 
