@@ -8,12 +8,10 @@ import sys
 import os
 import types as builtin_types
 
-import pytest
-
 # Гарантируем, что корень проекта есть в sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.rate_limiter import RateLimiter, rate_limit, global_limiter
+from utils.rate_limiter import RateLimiter, rate_limit
 
 
 class TestRateLimiter:

@@ -46,6 +46,7 @@ def db():
 # Пользователи
 # ---------------------------------------------------------------------------
 
+
 class TestUsers:
     def test_add_and_get_user(self, db):
         db.add_user(111, "john_doe")
@@ -72,6 +73,7 @@ class TestUsers:
 # ---------------------------------------------------------------------------
 # Подписки
 # ---------------------------------------------------------------------------
+
 
 class TestSubscriptions:
     def test_no_sub_by_default(self, db):
@@ -110,6 +112,7 @@ class TestSubscriptions:
 # Флаг sub_disabled
 # ---------------------------------------------------------------------------
 
+
 class TestSubDisabled:
     def test_not_disabled_by_default(self, db):
         db.add_user(20)
@@ -138,6 +141,7 @@ class TestSubDisabled:
 # Пробный период
 # ---------------------------------------------------------------------------
 
+
 class TestTrial:
     def test_trial_not_used_by_default(self, db):
         db.add_user(30)
@@ -159,6 +163,7 @@ class TestTrial:
 # ---------------------------------------------------------------------------
 # Pending payments
 # ---------------------------------------------------------------------------
+
 
 class TestPendingPayments:
     def test_no_pending_by_default(self, db):
@@ -208,17 +213,22 @@ class TestPendingPayments:
 # Напоминания
 # ---------------------------------------------------------------------------
 
+
 class TestReminder:
     def test_expiring_soon_returns_user(self, db):
         db.add_user(70)
         expire = int(time.time()) + 86400
-        db._execute("UPDATE users SET sub_until=?, reminded=0 WHERE user_id=?", (expire, 70))
+        db._execute(
+            "UPDATE users SET sub_until=?, reminded=0 WHERE user_id=?", (expire, 70)
+        )
         assert 70 in [r[0] for r in db.get_users_expiring_soon()]
 
     def test_mark_reminded_excludes_from_expiring(self, db):
         db.add_user(71)
         expire = int(time.time()) + 86400
-        db._execute("UPDATE users SET sub_until=?, reminded=0 WHERE user_id=?", (expire, 71))
+        db._execute(
+            "UPDATE users SET sub_until=?, reminded=0 WHERE user_id=?", (expire, 71)
+        )
         db.mark_reminded(71)
         assert 71 not in [r[0] for r in db.get_users_expiring_soon()]
 
@@ -232,6 +242,7 @@ class TestReminder:
 # ---------------------------------------------------------------------------
 # Статистика
 # ---------------------------------------------------------------------------
+
 
 class TestStats:
     def test_total_users_counts_added(self, db):
@@ -248,5 +259,7 @@ class TestStats:
 
     def test_total_subs_excludes_expired(self, db):
         db.add_user(83)
-        db._execute("UPDATE users SET sub_until=? WHERE user_id=?", (int(time.time()) - 1, 83))
+        db._execute(
+            "UPDATE users SET sub_until=? WHERE user_id=?", (int(time.time()) - 1, 83)
+        )
         assert db.has_sub(83) is False

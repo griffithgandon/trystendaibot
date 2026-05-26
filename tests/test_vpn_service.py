@@ -34,8 +34,11 @@ def _load_vpn_module():
 
     fake_db = builtin_types.ModuleType("database.db")
     fake_db.get_username = lambda uid: f"user_{uid}"
-    if "database" not in sys.modules or not hasattr(sys.modules["database"], "__path__"):
+    if "database" not in sys.modules or not hasattr(
+        sys.modules["database"], "__path__"
+    ):
         import database
+
         sys.modules["database"] = database
     sys.modules["database.db"] = fake_db
 
@@ -54,11 +57,13 @@ def vpn():
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _ok(obj=None):
     r = MagicMock()
     r.status_code = 200
     r.json.return_value = {"success": True, "obj": obj or []}
     return r
+
 
 def _fail(status=500):
     r = MagicMock()
@@ -66,14 +71,21 @@ def _fail(status=500):
     r.json.return_value = {"success": False}
     return r
 
+
 def _inbounds(inbounds: list):
     r = MagicMock()
     r.status_code = 200
     r.json.return_value = {"success": True, "obj": inbounds}
     return r
 
+
 def _vless_inbound(inbound_id: int, clients: list):
-    return {"id": inbound_id, "protocol": "vless", "settings": json.dumps({"clients": clients})}
+    return {
+        "id": inbound_id,
+        "protocol": "vless",
+        "settings": json.dumps({"clients": clients}),
+    }
+
 
 def _vless_client(user_id: int, enabled: bool = True, sub_id: str = "abc123"):
     return {
@@ -89,14 +101,19 @@ def _vless_client(user_id: int, enabled: bool = True, sub_id: str = "abc123"):
 # get_vpn_data
 # ---------------------------------------------------------------------------
 
+
 class TestGetVpnData:
     def test_returns_sub_url_when_client_found(self, vpn):
         client = _vless_client(100, sub_id="mysub")
-        with patch.object(vpn.session, "get", return_value=_inbounds([_vless_inbound(1, [client])])):
+        with patch.object(
+            vpn.session, "get", return_value=_inbounds([_vless_inbound(1, [client])])
+        ):
             assert vpn.get_vpn_data(100) == "https://sub.example.com/sub/mysub"
 
     def test_returns_none_when_client_not_found(self, vpn):
-        with patch.object(vpn.session, "get", return_value=_inbounds([_vless_inbound(1, [])])):
+        with patch.object(
+            vpn.session, "get", return_value=_inbounds([_vless_inbound(1, [])])
+        ):
             assert vpn.get_vpn_data(999) is None
 
     def test_returns_none_on_api_failure(self, vpn):
@@ -111,6 +128,7 @@ class TestGetVpnData:
 # ---------------------------------------------------------------------------
 # create_user
 # ---------------------------------------------------------------------------
+
 
 class TestCreateUser:
     def test_returns_true_on_success(self, vpn):
@@ -129,9 +147,11 @@ class TestCreateUser:
 
     def test_post_payload_contains_user_id_in_email(self, vpn):
         captured = []
+
         def fake_post(url, **kwargs):
             captured.append(kwargs.get("json", {}))
             return _ok()
+
         with patch.object(vpn.session, "post", side_effect=fake_post):
             vpn.create_user(203, 30)
         for payload in captured:
@@ -144,22 +164,29 @@ class TestCreateUser:
 # disable_user / enable_user
 # ---------------------------------------------------------------------------
 
+
 class TestDisableEnableUser:
     def test_disable_user_calls_update_endpoint(self, vpn):
         inbounds = [_vless_inbound(1, [_vless_client(300)])]
-        with patch.object(vpn.session, "get", return_value=_inbounds(inbounds)), \
-             patch.object(vpn.session, "post", return_value=_ok()) as mock_post:
+        with (
+            patch.object(vpn.session, "get", return_value=_inbounds(inbounds)),
+            patch.object(vpn.session, "post", return_value=_ok()) as mock_post,
+        ):
             assert vpn.disable_user(300) is True
         assert mock_post.called
 
     def test_disable_user_sets_enable_false(self, vpn):
         inbounds = [_vless_inbound(1, [_vless_client(301, enabled=True)])]
         sent = []
+
         def fake_post(url, **kwargs):
             sent.append(kwargs.get("json", {}))
             return _ok()
-        with patch.object(vpn.session, "get", return_value=_inbounds(inbounds)), \
-             patch.object(vpn.session, "post", side_effect=fake_post):
+
+        with (
+            patch.object(vpn.session, "get", return_value=_inbounds(inbounds)),
+            patch.object(vpn.session, "post", side_effect=fake_post),
+        ):
             vpn.disable_user(301)
         for payload in sent:
             for c in json.loads(payload.get("settings", "{}")).get("clients", []):
@@ -168,8 +195,10 @@ class TestDisableEnableUser:
 
     def test_disable_user_no_matching_client(self, vpn):
         inbounds = [_vless_inbound(1, [_vless_client(999)])]
-        with patch.object(vpn.session, "get", return_value=_inbounds(inbounds)), \
-             patch.object(vpn.session, "post", return_value=_ok()) as mock_post:
+        with (
+            patch.object(vpn.session, "get", return_value=_inbounds(inbounds)),
+            patch.object(vpn.session, "post", return_value=_ok()) as mock_post,
+        ):
             result = vpn.disable_user(302)
         assert mock_post.call_count == 0
         assert result is False
@@ -177,11 +206,15 @@ class TestDisableEnableUser:
     def test_enable_user_sets_enable_true(self, vpn):
         inbounds = [_vless_inbound(1, [_vless_client(303, enabled=False)])]
         sent = []
+
         def fake_post(url, **kwargs):
             sent.append(kwargs.get("json", {}))
             return _ok()
-        with patch.object(vpn.session, "get", return_value=_inbounds(inbounds)), \
-             patch.object(vpn.session, "post", side_effect=fake_post):
+
+        with (
+            patch.object(vpn.session, "get", return_value=_inbounds(inbounds)),
+            patch.object(vpn.session, "post", side_effect=fake_post),
+        ):
             vpn.enable_user(303)
         for payload in sent:
             for c in json.loads(payload.get("settings", "{}")).get("clients", []):
@@ -193,6 +226,7 @@ class TestDisableEnableUser:
 # extend_user
 # ---------------------------------------------------------------------------
 
+
 class TestExtendUser:
     def test_extend_increases_expiry(self, vpn):
         now_ms = int(time.time() * 1000)
@@ -200,11 +234,15 @@ class TestExtendUser:
         client["expiryTime"] = now_ms + 86400 * 1000 * 10
         inbounds = [_vless_inbound(1, [client])]
         sent = []
+
         def fake_post(url, **kwargs):
             sent.append(kwargs.get("json", {}))
             return _ok()
-        with patch.object(vpn.session, "get", return_value=_inbounds(inbounds)), \
-             patch.object(vpn.session, "post", side_effect=fake_post):
+
+        with (
+            patch.object(vpn.session, "get", return_value=_inbounds(inbounds)),
+            patch.object(vpn.session, "post", side_effect=fake_post),
+        ):
             assert vpn.extend_user(200, 30) is True
         for payload in sent:
             for c in json.loads(payload.get("settings", "{}")).get("clients", []):
@@ -215,11 +253,15 @@ class TestExtendUser:
     def test_extend_sets_enable_true(self, vpn):
         inbounds = [_vless_inbound(1, [_vless_client(201, enabled=False)])]
         sent = []
+
         def fake_post(url, **kwargs):
             sent.append(kwargs.get("json", {}))
             return _ok()
-        with patch.object(vpn.session, "get", return_value=_inbounds(inbounds)), \
-             patch.object(vpn.session, "post", side_effect=fake_post):
+
+        with (
+            patch.object(vpn.session, "get", return_value=_inbounds(inbounds)),
+            patch.object(vpn.session, "post", side_effect=fake_post),
+        ):
             vpn.extend_user(201, 30)
         for payload in sent:
             for c in json.loads(payload.get("settings", "{}")).get("clients", []):
@@ -231,24 +273,30 @@ class TestExtendUser:
 # delete_user
 # ---------------------------------------------------------------------------
 
+
 class TestDeleteUser:
     def test_delete_calls_del_client_endpoint(self, vpn):
         inbounds = [_vless_inbound(1, [_vless_client(400)])]
-        with patch.object(vpn.session, "get", return_value=_inbounds(inbounds)), \
-             patch.object(vpn.session, "post", return_value=_ok()) as mock_post:
+        with (
+            patch.object(vpn.session, "get", return_value=_inbounds(inbounds)),
+            patch.object(vpn.session, "post", return_value=_ok()) as mock_post,
+        ):
             assert vpn.delete_user(400) is True
         assert "delClient" in mock_post.call_args[0][0]
 
     def test_delete_returns_false_if_api_fails(self, vpn):
         inbounds = [_vless_inbound(1, [_vless_client(401)])]
-        with patch.object(vpn.session, "get", return_value=_inbounds(inbounds)), \
-             patch.object(vpn.session, "post", return_value=_fail()):
+        with (
+            patch.object(vpn.session, "get", return_value=_inbounds(inbounds)),
+            patch.object(vpn.session, "post", return_value=_fail()),
+        ):
             assert vpn.delete_user(401) is False
 
 
 # ---------------------------------------------------------------------------
 # get_online_users
 # ---------------------------------------------------------------------------
+
 
 class TestGetOnlineUsers:
     def test_returns_list_of_emails(self, vpn):
