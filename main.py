@@ -21,8 +21,8 @@ def sub_loop():
         try:
             check_subscriptions(bot)
 
-        except Exception as e:
-            print("SUB LOOP ERROR:", e)
+        except Exception as error:
+            print("SUB LOOP ERROR:", error)
 
         time.sleep(3600)
 
