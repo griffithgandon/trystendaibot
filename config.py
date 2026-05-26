@@ -13,7 +13,7 @@ def get_list(key):
 def get_int(key, default=0):
     try:
         return int(os.getenv(key, default))
-    except:
+    except ValueError:
         return default
 
 
@@ -61,26 +61,10 @@ HYSTERIA_SNI = os.getenv("HYSTERIA_SNI", "")
 
 # ===== TARIFFS =====
 TARIFFS = {
-    "1": {
-        "title": "30 дней — 150₽",
-        "days": 30,
-        "price": 150
-    },
-    "2": {
-        "title": "90 дней — 450₽",
-        "days": 90,
-        "price": 450
-    },
-    "3": {
-        "title": "180 дней — 900₽",
-        "days": 180,
-        "price": 900
-    },
-    "4": {
-        "title": "360 дней — 1500₽",
-        "days": 360,
-        "price": 1500
-    }
+    "1": {"title": "30 дней — 150₽", "days": 30, "price": 150},
+    "2": {"title": "90 дней — 450₽", "days": 90, "price": 450},
+    "3": {"title": "180 дней — 900₽", "days": 180, "price": 900},
+    "4": {"title": "360 дней — 1500₽", "days": 360, "price": 1500},
 }
 
 
@@ -140,8 +124,14 @@ print("====================")
 
 # ===== SERVERS =====
 SERVERS = [
-    {"name": os.getenv("SERVER1_NAME", "Сервер 1"), "url": os.getenv("SERVER1_URL", "")},
-    {"name": os.getenv("SERVER2_NAME", "Сервер 2"), "url": os.getenv("SERVER2_URL", "")},
+    {
+        "name": os.getenv("SERVER1_NAME", "Сервер 1"),
+        "url": os.getenv("SERVER1_URL", ""),
+    },
+    {
+        "name": os.getenv("SERVER2_NAME", "Сервер 2"),
+        "url": os.getenv("SERVER2_URL", ""),
+    },
 ]
 
 # ===== TLS =====

@@ -3,12 +3,8 @@ import time
 import threading
 from config import DB_PATH
 
-
 # ===== CONNECT =====
-conn = sqlite3.connect(
-    DB_PATH,
-    check_same_thread=False
-)
+conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 
 # Один глобальный Lock для всех операций с БД
 # Защищает от гонок при многопоточном polling
@@ -68,6 +64,7 @@ except Exception:
 
 # ── Хелпер ───────────────────────────────────────────────────────────────────
 
+
 def _execute(query: str, params: tuple = ()):
     """Thread-safe execute + commit."""
     with _lock:
@@ -93,21 +90,18 @@ def add_user(user_id: int, telegram_username: str | None = None):
     with _lock:
         cursor.execute(
             "INSERT OR IGNORE INTO users (user_id, telegram_username) VALUES (?, ?)",
-            (user_id, telegram_username)
+            (user_id, telegram_username),
         )
         if telegram_username:
             cursor.execute(
                 "UPDATE users SET telegram_username=? WHERE user_id=?",
-                (telegram_username, user_id)
+                (telegram_username, user_id),
             )
         conn.commit()
 
 
 def save_username(user_id: int, username: str):
-    _execute(
-        "UPDATE users SET username=? WHERE user_id=?",
-        (username, user_id)
-    )
+    _execute("UPDATE users SET username=? WHERE user_id=?", (username, user_id))
 
 
 def get_username(user_id: int) -> str | None:
@@ -130,8 +124,7 @@ def set_subscription(user_id: int, days: int):
     expire = (current_sub + days * 86400) if current_sub > now else (now + days * 86400)
 
     _execute(
-        "UPDATE users SET sub_until=?, reminded=0 WHERE user_id=?",
-        (expire, user_id)
+        "UPDATE users SET sub_until=?, reminded=0 WHERE user_id=?", (expire, user_id)
     )
 
 
@@ -153,14 +146,14 @@ def get_sub_until(user_id: int) -> int:
 def add_pending_payment(user_id: int, tariff_id: str, payment_type: str = "new"):
     _execute(
         "INSERT OR REPLACE INTO pending_payments (user_id, tariff_id, created_at, payment_type) VALUES (?, ?, ?, ?)",
-        (user_id, tariff_id, int(time.time()), payment_type)
+        (user_id, tariff_id, int(time.time()), payment_type),
     )
 
 
 def clear_old_pending():
     _execute(
         "DELETE FROM pending_payments WHERE created_at < ? AND payment_type != 'trial'",
-        (int(time.time()) - 1800,)
+        (int(time.time()) - 1800,),
     )
 
 
@@ -197,8 +190,7 @@ def get_total_users() -> int:
 
 def get_total_subs() -> int:
     row = _fetchone(
-        "SELECT COUNT(*) FROM users WHERE sub_until > ?",
-        (int(time.time()),)
+        "SELECT COUNT(*) FROM users WHERE sub_until > ?", (int(time.time()),)
     )
     return row[0] if row else 0
 
@@ -213,7 +205,7 @@ def get_users_expiring_soon() -> list:
     two_days = now + 2 * 86400
     return _fetchall(
         "SELECT user_id, sub_until FROM users WHERE sub_until > ? AND sub_until < ? AND reminded=0",
-        (now, two_days)
+        (now, two_days),
     )
 
 
@@ -225,15 +217,14 @@ def get_expired_users() -> list:
     """Пользователи с истёкшей, но ещё не обнулённой подпиской."""
     return _fetchall(
         "SELECT user_id FROM users WHERE sub_until > 0 AND sub_until < ?",
-        (int(time.time()),)
+        (int(time.time()),),
     )
 
 
 # ===== USER LIST FOR ADMIN =====
 def get_recent_users(limit: int = 20) -> list:
     return _fetchall(
-        "SELECT user_id FROM users ORDER BY user_id DESC LIMIT ?",
-        (limit,)
+        "SELECT user_id FROM users ORDER BY user_id DESC LIMIT ?", (limit,)
     )
 
 
@@ -244,8 +235,7 @@ def get_all_user_ids() -> list:
 
 def get_pending_payment_type(user_id: int) -> str:
     row = _fetchone(
-        "SELECT payment_type FROM pending_payments WHERE user_id=?",
-        (user_id,)
+        "SELECT payment_type FROM pending_payments WHERE user_id=?", (user_id,)
     )
     return row[0] if row else "new"
 
@@ -254,7 +244,7 @@ def get_pending_payment_info(user_id: int) -> dict | None:
     """Возвращает словарь {tariff_id, payment_type} или None."""
     row = _fetchone(
         "SELECT tariff_id, payment_type FROM pending_payments WHERE user_id=?",
-        (user_id,)
+        (user_id,),
     )
     if not row:
         return None
@@ -278,13 +268,15 @@ def get_total_trials() -> int:
     row = _fetchone("SELECT COUNT(*) FROM users WHERE trial_used=1")
     return row[0] if row else 0
 
+
 # ===== DISABLED STATUS =====
 def is_sub_disabled(user_id: int) -> bool:
     row = _fetchone("SELECT sub_disabled FROM users WHERE user_id=?", (user_id,))
     return bool(row and row[0])
 
+
 def set_sub_disabled(user_id: int, disabled: bool):
     _execute(
         "UPDATE users SET sub_disabled=? WHERE user_id=?",
-        (1 if disabled else 0, user_id)
+        (1 if disabled else 0, user_id),
     )

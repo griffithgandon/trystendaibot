@@ -16,15 +16,13 @@ from config import (
 from database.db import get_username
 
 import urllib3
+
 if SSL_VERIFY is False:
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 session = requests.Session()
 
-HEADERS = {
-    "Authorization": f"Bearer {API_TOKEN}",
-    "Accept": "application/json"
-}
+HEADERS = {"Authorization": f"Bearer {API_TOKEN}", "Accept": "application/json"}
 
 REQUEST_TIMEOUT = 10
 
@@ -36,7 +34,7 @@ def get_inbounds() -> dict | None:
             f"{PANEL_URL}/panel/api/inbounds/list",
             headers=HEADERS,
             verify=SSL_VERIFY,
-            timeout=REQUEST_TIMEOUT
+            timeout=REQUEST_TIMEOUT,
         )
 
         if r.status_code != 200:
@@ -74,12 +72,12 @@ def create_user(user_id: int, days: int) -> bool:
             "limitIp": 1,
             "totalGB": 0,
             "subId": sub_id,
-            "comment": username
+            "comment": username,
         }
 
         vless_payload = {
             "id": inbound_id,
-            "settings": json.dumps({"clients": [vless_client]})
+            "settings": json.dumps({"clients": [vless_client]}),
         }
 
         try:
@@ -88,7 +86,7 @@ def create_user(user_id: int, days: int) -> bool:
                 headers=HEADERS,
                 json=vless_payload,
                 verify=SSL_VERIFY,
-                timeout=REQUEST_TIMEOUT
+                timeout=REQUEST_TIMEOUT,
             )
             print(f"VLESS [{inbound_id}] STATUS:", r.status_code, r.text)
 
@@ -105,7 +103,7 @@ def create_user(user_id: int, days: int) -> bool:
                 f"{PANEL_URL}/panel/api/inbounds/get/{HYSTERIA_INBOUND_ID}",
                 headers=HEADERS,
                 verify=SSL_VERIFY,
-                timeout=REQUEST_TIMEOUT
+                timeout=REQUEST_TIMEOUT,
             )
             print("HYSTERIA GET STATUS:", r.status_code)
 
@@ -124,7 +122,7 @@ def create_user(user_id: int, days: int) -> bool:
                     "limitIp": 1,
                     "totalGB": 0,
                     "subId": sub_id,
-                    "comment": username
+                    "comment": username,
                 }
                 clients.append(new_client)
                 settings["clients"] = clients
@@ -135,7 +133,7 @@ def create_user(user_id: int, days: int) -> bool:
                     headers=HEADERS,
                     json=inbound_data,
                     verify=SSL_VERIFY,
-                    timeout=REQUEST_TIMEOUT
+                    timeout=REQUEST_TIMEOUT,
                 )
                 print("HYSTERIA UPDATE STATUS:", r2.status_code, r2.text)
 
@@ -173,7 +171,7 @@ def disable_user(user_id: int) -> bool:
                     f"{PANEL_URL}/panel/api/inbounds/get/{inbound_id}",
                     headers=HEADERS,
                     verify=SSL_VERIFY,
-                    timeout=REQUEST_TIMEOUT
+                    timeout=REQUEST_TIMEOUT,
                 )
 
                 if r_get.status_code != 200 or not r_get.json().get("success"):
@@ -199,9 +197,11 @@ def disable_user(user_id: int) -> bool:
                     headers=HEADERS,
                     json=full_inbound,
                     verify=SSL_VERIFY,
-                    timeout=REQUEST_TIMEOUT
+                    timeout=REQUEST_TIMEOUT,
                 )
-                print(f"DISABLE HY2 [{inbound_id}] STATUS:", r_upd.status_code, r_upd.text)
+                print(
+                    f"DISABLE HY2 [{inbound_id}] STATUS:", r_upd.status_code, r_upd.text
+                )
 
                 if r_upd.status_code == 200 and r_upd.json().get("success"):
                     success = True
@@ -232,7 +232,7 @@ def disable_user(user_id: int) -> bool:
 
                 payload = {
                     "id": inbound_id,
-                    "settings": json.dumps({"clients": [client]})
+                    "settings": json.dumps({"clients": [client]}),
                 }
 
                 try:
@@ -241,9 +241,11 @@ def disable_user(user_id: int) -> bool:
                         headers=HEADERS,
                         json=payload,
                         verify=SSL_VERIFY,
-                        timeout=REQUEST_TIMEOUT
+                        timeout=REQUEST_TIMEOUT,
                     )
-                    print(f"DISABLE VLESS [{inbound_id}] STATUS:", r.status_code, r.text)
+                    print(
+                        f"DISABLE VLESS [{inbound_id}] STATUS:", r.status_code, r.text
+                    )
 
                     if r.status_code == 200 and r.json().get("success"):
                         success = True
@@ -277,7 +279,7 @@ def enable_user(user_id: int) -> bool:
                     f"{PANEL_URL}/panel/api/inbounds/get/{inbound_id}",
                     headers=HEADERS,
                     verify=SSL_VERIFY,
-                    timeout=REQUEST_TIMEOUT
+                    timeout=REQUEST_TIMEOUT,
                 )
 
                 if r_get.status_code != 200 or not r_get.json().get("success"):
@@ -302,9 +304,11 @@ def enable_user(user_id: int) -> bool:
                     headers=HEADERS,
                     json=full_inbound,
                     verify=SSL_VERIFY,
-                    timeout=REQUEST_TIMEOUT
+                    timeout=REQUEST_TIMEOUT,
                 )
-                print(f"ENABLE HY2 [{inbound_id}] STATUS:", r_upd.status_code, r_upd.text)
+                print(
+                    f"ENABLE HY2 [{inbound_id}] STATUS:", r_upd.status_code, r_upd.text
+                )
 
                 if r_upd.status_code == 200 and r_upd.json().get("success"):
                     success = True
@@ -334,7 +338,7 @@ def enable_user(user_id: int) -> bool:
 
                 payload = {
                     "id": inbound_id,
-                    "settings": json.dumps({"clients": [client]})
+                    "settings": json.dumps({"clients": [client]}),
                 }
 
                 try:
@@ -343,7 +347,7 @@ def enable_user(user_id: int) -> bool:
                         headers=HEADERS,
                         json=payload,
                         verify=SSL_VERIFY,
-                        timeout=REQUEST_TIMEOUT
+                        timeout=REQUEST_TIMEOUT,
                     )
                     print(f"ENABLE VLESS [{inbound_id}] STATUS:", r.status_code, r.text)
 
@@ -378,7 +382,7 @@ def delete_user(user_id: int) -> bool:
                     f"{PANEL_URL}/panel/api/inbounds/get/{inbound_id}",
                     headers=HEADERS,
                     verify=SSL_VERIFY,
-                    timeout=REQUEST_TIMEOUT
+                    timeout=REQUEST_TIMEOUT,
                 )
 
                 if r_get.status_code != 200 or not r_get.json().get("success"):
@@ -390,7 +394,8 @@ def delete_user(user_id: int) -> bool:
 
                 clients_before = full_settings.get("clients", [])
                 clients_after = [
-                    c for c in clients_before
+                    c
+                    for c in clients_before
                     if not c.get("email", "").startswith(str(user_id))
                 ]
 
@@ -406,9 +411,13 @@ def delete_user(user_id: int) -> bool:
                     headers=HEADERS,
                     json=full_inbound,
                     verify=SSL_VERIFY,
-                    timeout=REQUEST_TIMEOUT
+                    timeout=REQUEST_TIMEOUT,
                 )
-                print(f"DELETE HY2 UPDATE [{inbound_id}] STATUS:", r_upd.status_code, r_upd.text)
+                print(
+                    f"DELETE HY2 UPDATE [{inbound_id}] STATUS:",
+                    r_upd.status_code,
+                    r_upd.text,
+                )
 
                 if r_upd.status_code == 200 and r_upd.json().get("success"):
                     success = True
@@ -439,7 +448,7 @@ def delete_user(user_id: int) -> bool:
                         f"{PANEL_URL}/panel/api/inbounds/{inbound_id}/delClient/{client_id}",
                         headers=HEADERS,
                         verify=SSL_VERIFY,
-                        timeout=REQUEST_TIMEOUT
+                        timeout=REQUEST_TIMEOUT,
                     )
                     print(f"DELETE VLESS [{inbound_id}] STATUS:", r.status_code, r.text)
 
@@ -483,7 +492,7 @@ def get_online_users() -> list[str] | None:
             f"{PANEL_URL}/panel/api/inbounds/onlines",
             headers=HEADERS,
             verify=SSL_VERIFY,
-            timeout=REQUEST_TIMEOUT
+            timeout=REQUEST_TIMEOUT,
         )
 
         if r.status_code != 200:
@@ -540,7 +549,7 @@ def extend_user(user_id: int, days: int) -> bool:
                         f"{PANEL_URL}/panel/api/inbounds/get/{inbound_id}",
                         headers=HEADERS,
                         verify=SSL_VERIFY,
-                        timeout=REQUEST_TIMEOUT
+                        timeout=REQUEST_TIMEOUT,
                     )
                     if r_get.status_code != 200 or not r_get.json().get("success"):
                         print(f"EXTEND HY2 GET [{inbound_id}] ERROR:", r_get.text)
@@ -571,9 +580,13 @@ def extend_user(user_id: int, days: int) -> bool:
                         headers=HEADERS,
                         json=full_inbound,
                         verify=SSL_VERIFY,
-                        timeout=REQUEST_TIMEOUT
+                        timeout=REQUEST_TIMEOUT,
                     )
-                    print(f"EXTEND HY2 [{inbound_id}] STATUS:", r_upd.status_code, r_upd.text)
+                    print(
+                        f"EXTEND HY2 [{inbound_id}] STATUS:",
+                        r_upd.status_code,
+                        r_upd.text,
+                    )
 
                     if r_upd.status_code == 200 and r_upd.json().get("success"):
                         success = True
@@ -588,7 +601,7 @@ def extend_user(user_id: int, days: int) -> bool:
 
                 payload = {
                     "id": inbound_id,
-                    "settings": json.dumps({"clients": [client]})
+                    "settings": json.dumps({"clients": [client]}),
                 }
 
                 try:
@@ -597,7 +610,7 @@ def extend_user(user_id: int, days: int) -> bool:
                         headers=HEADERS,
                         json=payload,
                         verify=SSL_VERIFY,
-                        timeout=REQUEST_TIMEOUT
+                        timeout=REQUEST_TIMEOUT,
                     )
                     print(f"EXTEND VLESS [{inbound_id}] STATUS:", r.status_code, r.text)
 

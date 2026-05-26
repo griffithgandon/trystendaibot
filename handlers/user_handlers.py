@@ -1,31 +1,38 @@
 from telebot import types
 import time
 import requests
-import json
 from config import (
     ADMIN_ID,
-    ADMIN_USERNAMES,
     PAYMENT_TEXT,
     TARIFFS,
-    PANEL_URL,
-    API_TOKEN,
     SERVERS,
     TRIAL_DAYS,
     TRIAL_AUTO_APPROVE,
 )
 
 from database.db import (
-    add_user, get_username, save_username,
-    get_sub_until, has_sub, has_pending_payment,
-    add_pending_payment, remove_pending_payment,
-    get_telegram_username, get_pending_payment_type,
-    has_used_trial, set_trial_used, is_sub_disabled,
+    add_user,
+    get_username,
+    save_username,
+    get_sub_until,
+    has_sub,
+    has_pending_payment,
+    add_pending_payment,
+    remove_pending_payment,
+    has_used_trial,
+    set_trial_used,
+    is_sub_disabled,
 )
 
 from database.db import set_sub_disabled
 from services.vpn import create_user, get_vpn_data, extend_user
 from utils.qr import generate_qr
-from utils.rate_limiter import rate_limit, payment_limiter, support_limiter, start_limiter
+from utils.rate_limiter import (
+    rate_limit,
+    payment_limiter,
+    support_limiter,
+    start_limiter,
+)
 
 
 # ===== UI =====
@@ -34,26 +41,22 @@ def get_main_menu(user_id: int) -> types.InlineKeyboardMarkup:
 
     markup.add(
         types.InlineKeyboardButton("👤 Профиль", callback_data="profile"),
-        types.InlineKeyboardButton("💎 Купить VPN", callback_data="buy")
+        types.InlineKeyboardButton("💎 Купить VPN", callback_data="buy"),
     )
     markup.add(
         types.InlineKeyboardButton("🔑 Мой VPN", callback_data="token"),
-        types.InlineKeyboardButton("💬 Поддержка", callback_data="support")
+        types.InlineKeyboardButton("💬 Поддержка", callback_data="support"),
     )
 
     if has_sub(user_id) or is_sub_disabled(user_id):
-        markup.add(
-            types.InlineKeyboardButton("🔄 Продлить", callback_data="renew")
-        )
+        markup.add(types.InlineKeyboardButton("🔄 Продлить", callback_data="renew"))
 
     markup.add(
         types.InlineKeyboardButton("🖥 Статус сервера", callback_data="server_status")
     )
 
     if user_id in ADMIN_ID:
-        markup.add(
-            types.InlineKeyboardButton("⚙️ Админ", callback_data="admin_panel")
-        )
+        markup.add(types.InlineKeyboardButton("⚙️ Админ", callback_data="admin_panel"))
 
     return markup
 
@@ -67,10 +70,7 @@ def back_button() -> types.InlineKeyboardMarkup:
 def safe_edit(bot, call, text: str, markup=None):
     try:
         bot.edit_message_text(
-            text,
-            call.message.chat.id,
-            call.message.message_id,
-            reply_markup=markup
+            text, call.message.chat.id, call.message.message_id, reply_markup=markup
         )
     except Exception as e:
         if "message is not modified" not in str(e):
@@ -96,7 +96,7 @@ def register_handlers(bot):
                 bot.send_message(
                     message.chat.id,
                     "📱 Главное меню:",
-                    reply_markup=get_main_menu(user_id)
+                    reply_markup=get_main_menu(user_id),
                 )
             else:
                 msg = bot.send_message(message.chat.id, "👋 Введи свой ник:")
@@ -113,8 +113,7 @@ def register_handlers(bot):
 
             if len(username) < 2 or len(username) > 32:
                 msg = bot.send_message(
-                    message.chat.id,
-                    "❌ Ник должен быть от 2 до 32 символов"
+                    message.chat.id, "❌ Ник должен быть от 2 до 32 символов"
                 )
                 bot.register_next_step_handler(msg, save_name)
                 return
@@ -123,7 +122,7 @@ def register_handlers(bot):
             bot.send_message(
                 message.chat.id,
                 f"✅ Ник сохранён: {username}",
-                reply_markup=get_main_menu(user_id)
+                reply_markup=get_main_menu(user_id),
             )
 
         except Exception as e:
@@ -149,7 +148,9 @@ def register_handlers(bot):
             user_id = call.from_user.id
             username = get_username(user_id) or "—"
             sub_until = get_sub_until(user_id)
-            trial_status = "✅ Использован" if has_used_trial(user_id) else "🎁 Доступен"
+            trial_status = (
+                "✅ Использован" if has_used_trial(user_id) else "🎁 Доступен"
+            )
 
             if sub_until > int(time.time()):
                 date = time.strftime("%d.%m.%Y %H:%M", time.localtime(sub_until))
@@ -160,13 +161,14 @@ def register_handlers(bot):
                 status = "❌ Нет"
 
             safe_edit(
-                bot, call,
+                bot,
+                call,
                 f"👤 Профиль\n\n"
                 f"🆔 ID: {user_id}\n"
                 f"👤 Ник: {username}\n"
                 f"💎 Подписка: {status}\n"
                 f"🎁 Пробный период: {trial_status}",
-                back_button()
+                back_button(),
             )
 
         except Exception as e:
@@ -189,7 +191,7 @@ def register_handlers(bot):
                 bot.answer_callback_query(
                     call.id,
                     f"✅ У вас уже есть активная подписка до {date}\n\nДля продления используйте кнопку 🔄 Продлить",
-                    show_alert=True
+                    show_alert=True,
                 )
                 return
 
@@ -200,7 +202,7 @@ def register_handlers(bot):
                 markup.add(
                     types.InlineKeyboardButton(
                         f"🎁 Пробный период — {TRIAL_DAYS} дней бесплатно",
-                        callback_data="trial_request"
+                        callback_data="trial_request",
                     )
                 )
 
@@ -208,7 +210,7 @@ def register_handlers(bot):
                 markup.add(
                     types.InlineKeyboardButton(
                         tariff.get("title", "Тариф"),
-                        callback_data=f"tariff_{tariff_id}"
+                        callback_data=f"tariff_{tariff_id}",
                     )
                 )
 
@@ -231,25 +233,19 @@ def register_handlers(bot):
             # Двойная проверка (кнопка могла остаться в кэше)
             if has_used_trial(user_id):
                 bot.answer_callback_query(
-                    call.id,
-                    "❌ Пробный период уже был использован",
-                    show_alert=True
+                    call.id, "❌ Пробный период уже был использован", show_alert=True
                 )
                 return
 
             if has_sub(user_id):
                 bot.answer_callback_query(
-                    call.id,
-                    "❌ У вас уже есть активная подписка",
-                    show_alert=True
+                    call.id, "❌ У вас уже есть активная подписка", show_alert=True
                 )
                 return
 
             if has_pending_payment(user_id):
                 bot.answer_callback_query(
-                    call.id,
-                    "⏳ У тебя уже есть активная заявка",
-                    show_alert=True
+                    call.id, "⏳ У тебя уже есть активная заявка", show_alert=True
                 )
                 return
 
@@ -258,16 +254,18 @@ def register_handlers(bot):
             # ── Авто-выдача ───────────────────────────────────────────────────
             if TRIAL_AUTO_APPROVE:
                 from database.db import set_subscription
+
                 set_subscription(user_id, TRIAL_DAYS)
                 set_trial_used(user_id)
                 create_user(user_id, TRIAL_DAYS)
 
                 safe_edit(
-                    bot, call,
+                    bot,
+                    call,
                     f"🎁 Пробный период активирован!\n\n"
                     f"📅 Длительность: {TRIAL_DAYS} дней\n\n"
                     f"Нажми 🔑 Мой VPN чтобы получить конфиг.",
-                    back_button()
+                    back_button(),
                 )
 
                 # Уведомляем админов
@@ -278,7 +276,7 @@ def register_handlers(bot):
                             f"🎁 Пробный период выдан автоматически\n\n"
                             f"👤 {username}\n"
                             f"🆔 ID: {user_id}\n"
-                            f"📅 Дней: {TRIAL_DAYS}"
+                            f"📅 Дней: {TRIAL_DAYS}",
                         )
                     except Exception:
                         pass
@@ -291,12 +289,11 @@ def register_handlers(bot):
                 markup.add(
                     types.InlineKeyboardButton(
                         "✅ Одобрить пробный период",
-                        callback_data=f"approve_trial|{user_id}"
+                        callback_data=f"approve_trial|{user_id}",
                     ),
                     types.InlineKeyboardButton(
-                        "❌ Отклонить",
-                        callback_data=f"decline_trial|{user_id}"
-                    )
+                        "❌ Отклонить", callback_data=f"decline_trial|{user_id}"
+                    ),
                 )
 
                 for admin in ADMIN_ID:
@@ -307,16 +304,17 @@ def register_handlers(bot):
                             f"👤 {username}\n"
                             f"🆔 ID: {user_id}\n"
                             f"📅 Дней: {TRIAL_DAYS}",
-                            reply_markup=markup
+                            reply_markup=markup,
                         )
                     except Exception:
                         pass
 
                 safe_edit(
-                    bot, call,
+                    bot,
+                    call,
                     "🎁 Заявка на пробный период отправлена\n\n"
                     "⏳ Ожидайте подтверждения от администратора",
-                    back_button()
+                    back_button(),
                 )
 
         except Exception as e:
@@ -331,8 +329,12 @@ def register_handlers(bot):
         try:
             bot.answer_callback_query(call.id)
 
-            if not has_sub(call.from_user.id) and not is_sub_disabled(call.from_user.id):
-                bot.answer_callback_query(call.id, "❌ Нет активной подписки", show_alert=True)
+            if not has_sub(call.from_user.id) and not is_sub_disabled(
+                call.from_user.id
+            ):
+                bot.answer_callback_query(
+                    call.id, "❌ Нет активной подписки", show_alert=True
+                )
                 return
 
             markup = types.InlineKeyboardMarkup(row_width=1)
@@ -341,7 +343,7 @@ def register_handlers(bot):
                 markup.add(
                     types.InlineKeyboardButton(
                         tariff.get("title", "Тариф"),
-                        callback_data=f"renew_tariff_{tariff_id}"
+                        callback_data=f"renew_tariff_{tariff_id}",
                     )
                 )
 
@@ -360,14 +362,16 @@ def register_handlers(bot):
         try:
             bot.answer_callback_query(call.id)
 
-            tariff_id = call.data[len("renew_tariff_"):]
+            tariff_id = call.data[len("renew_tariff_") :]
             tariff = TARIFFS.get(tariff_id)
             if not tariff:
                 return
 
             markup = types.InlineKeyboardMarkup(row_width=1)
             markup.add(
-                types.InlineKeyboardButton("✅ Я оплатил", callback_data=f"renew_paid_{tariff_id}")
+                types.InlineKeyboardButton(
+                    "✅ Я оплатил", callback_data=f"renew_paid_{tariff_id}"
+                )
             )
             markup.add(types.InlineKeyboardButton("⬅️ Назад", callback_data="renew"))
 
@@ -398,7 +402,7 @@ def register_handlers(bot):
         try:
             bot.answer_callback_query(call.id)
 
-            tariff_id = call.data[len("renew_paid_"):]
+            tariff_id = call.data[len("renew_paid_") :]
             tariff = TARIFFS.get(tariff_id)
             if not tariff:
                 return
@@ -407,9 +411,7 @@ def register_handlers(bot):
 
             if has_pending_payment(user_id):
                 bot.answer_callback_query(
-                    call.id,
-                    "⏳ У тебя уже есть активная заявка",
-                    show_alert=True
+                    call.id, "⏳ У тебя уже есть активная заявка", show_alert=True
                 )
                 return
 
@@ -423,7 +425,7 @@ def register_handlers(bot):
             markup.add(
                 types.InlineKeyboardButton(
                     "✅ Подтвердить продление",
-                    callback_data=f"approve|{user_id}|{tariff_id}"
+                    callback_data=f"approve|{user_id}|{tariff_id}",
                 )
             )
 
@@ -437,15 +439,16 @@ def register_handlers(bot):
                         f"📅 Подписка до: {date}\n\n"
                         f"📦 Тариф: {tariff.get('title')}\n"
                         f"💰 Сумма: {tariff.get('price')}₽",
-                        reply_markup=markup
+                        reply_markup=markup,
                     )
                 except Exception:
                     pass
 
             safe_edit(
-                bot, call,
+                bot,
+                call,
                 "✅ Заявка на продление отправлена\n\n⏳ Ожидайте подтверждения",
-                back_button()
+                back_button(),
             )
 
         except Exception as e:
@@ -460,7 +463,7 @@ def register_handlers(bot):
         try:
             bot.answer_callback_query(call.id)
 
-            tariff_id = call.data[len("tariff_"):]
+            tariff_id = call.data[len("tariff_") :]
 
             tariff = TARIFFS.get(tariff_id)
             if not tariff:
@@ -468,7 +471,9 @@ def register_handlers(bot):
 
             markup = types.InlineKeyboardMarkup(row_width=1)
             markup.add(
-                types.InlineKeyboardButton("✅ Я оплатил", callback_data=f"paid_{tariff_id}")
+                types.InlineKeyboardButton(
+                    "✅ Я оплатил", callback_data=f"paid_{tariff_id}"
+                )
             )
             markup.add(types.InlineKeyboardButton("⬅️ Назад", callback_data="buy"))
 
@@ -494,7 +499,7 @@ def register_handlers(bot):
         try:
             bot.answer_callback_query(call.id)
 
-            tariff_id = call.data[len("paid_"):]
+            tariff_id = call.data[len("paid_") :]
             tariff = TARIFFS.get(tariff_id)
             if not tariff:
                 return
@@ -503,9 +508,7 @@ def register_handlers(bot):
 
             if has_pending_payment(user_id):
                 bot.answer_callback_query(
-                    call.id,
-                    "⏳ У тебя уже есть активная заявка",
-                    show_alert=True
+                    call.id, "⏳ У тебя уже есть активная заявка", show_alert=True
                 )
                 return
 
@@ -516,8 +519,7 @@ def register_handlers(bot):
             markup = types.InlineKeyboardMarkup()
             markup.add(
                 types.InlineKeyboardButton(
-                    "✅ Подтвердить",
-                    callback_data=f"approve|{user_id}|{tariff_id}"
+                    "✅ Подтвердить", callback_data=f"approve|{user_id}|{tariff_id}"
                 )
             )
 
@@ -530,15 +532,16 @@ def register_handlers(bot):
                         f"🆔 ID: {user_id}\n\n"
                         f"📦 Тариф: {tariff.get('title')}\n"
                         f"💰 Сумма: {tariff.get('price')}₽",
-                        reply_markup=markup
+                        reply_markup=markup,
                     )
                 except Exception:
                     pass
 
             safe_edit(
-                bot, call,
+                bot,
+                call,
                 "✅ Заявка отправлена\n\n⏳ Ожидайте подтверждения",
-                back_button()
+                back_button(),
             )
 
         except Exception as e:
@@ -563,13 +566,18 @@ def register_handlers(bot):
                 return
 
             if not has_pending_payment(user_id):
-                bot.answer_callback_query(call.id, "⚠️ Заявка не найдена или уже обработана", show_alert=True)
+                bot.answer_callback_query(
+                    call.id, "⚠️ Заявка не найдена или уже обработана", show_alert=True
+                )
                 return
 
             from database.db import get_pending_payment_info, set_subscription
+
             pending = get_pending_payment_info(user_id)
             if not pending or pending["tariff_id"] != tariff_id:
-                bot.answer_callback_query(call.id, "⚠️ Тариф не совпадает с заявкой", show_alert=True)
+                bot.answer_callback_query(
+                    call.id, "⚠️ Тариф не совпадает с заявкой", show_alert=True
+                )
                 return
 
             days = tariff.get("days", 30)
@@ -594,7 +602,7 @@ def register_handlers(bot):
                     f"{type_label} подтверждено\n\n"
                     f"📦 Тариф: {tariff.get('title')}\n"
                     f"📅 Добавлено: {days} дней\n\n"
-                    f"🔑 VPN {'продлён' if payment_type == 'renew' else 'активирован'}"
+                    f"🔑 VPN {'продлён' if payment_type == 'renew' else 'активирован'}",
                 )
             except Exception:
                 pass
@@ -614,8 +622,7 @@ def register_handlers(bot):
         try:
             bot.answer_callback_query(call.id)
             msg = bot.send_message(
-                call.message.chat.id,
-                "💬 Напиши сообщение и мы ответим:"
+                call.message.chat.id, "💬 Напиши сообщение и мы ответим:"
             )
             bot.register_next_step_handler(msg, send_support)
 
@@ -643,8 +650,7 @@ def register_handlers(bot):
             markup = types.InlineKeyboardMarkup()
             markup.add(
                 types.InlineKeyboardButton(
-                    "✉️ Ответить",
-                    callback_data=f"reply|{user_id}"
+                    "✉️ Ответить", callback_data=f"reply|{user_id}"
                 )
             )
 
@@ -656,7 +662,7 @@ def register_handlers(bot):
                         f"👤 {username}\n"
                         f"🆔 ID: {user_id}\n\n"
                         f"📩 Сообщение:\n{text}",
-                        reply_markup=markup
+                        reply_markup=markup,
                     )
                 except Exception:
                     pass
@@ -682,8 +688,7 @@ def register_handlers(bot):
             user_id = int(parts[1])
 
             msg = bot.send_message(
-                call.message.chat.id,
-                f"✉️ Ответ пользователю {user_id}:"
+                call.message.chat.id, f"✉️ Ответ пользователю {user_id}:"
             )
             bot.register_next_step_handler(msg, lambda m: send_reply(m, user_id))
 
@@ -693,10 +698,7 @@ def register_handlers(bot):
     # ===== SEND REPLY =====
     def send_reply(message, user_id: int):
         try:
-            bot.send_message(
-                user_id,
-                f"💬 Ответ поддержки\n\n{message.text}"
-            )
+            bot.send_message(user_id, f"💬 Ответ поддержки\n\n{message.text}")
             bot.send_message(message.chat.id, "✅ Ответ отправлен")
         except Exception as e:
             print("SEND REPLY ERROR:", e)
@@ -713,15 +715,22 @@ def register_handlers(bot):
 
             if not has_sub(user_id):
                 if is_sub_disabled(user_id):
-                    bot.answer_callback_query(call.id, "⏸ Подписка отключена — продлите для восстановления",
-                                              show_alert=True)
+                    bot.answer_callback_query(
+                        call.id,
+                        "⏸ Подписка отключена — продлите для восстановления",
+                        show_alert=True,
+                    )
                 else:
-                    bot.answer_callback_query(call.id, "❌ Нет подписки", show_alert=True)
+                    bot.answer_callback_query(
+                        call.id, "❌ Нет подписки", show_alert=True
+                    )
                 return
 
             sub = get_vpn_data(user_id)
             if not sub:
-                bot.answer_callback_query(call.id, "❌ Не удалось получить данные VPN", show_alert=True)
+                bot.answer_callback_query(
+                    call.id, "❌ Не удалось получить данные VPN", show_alert=True
+                )
                 return
 
             safe_edit(bot, call, f"🔑 Твой VPN\n\n{sub}", back_button())
@@ -748,11 +757,12 @@ def register_handlers(bot):
                 url = server["url"]
 
                 try:
-                    r = requests.get(url, verify=False, timeout=5)
+                    requests.get(url, verify=False, timeout=5)
                     status = "🟢 Онлайн"
                 except requests.exceptions.Timeout:
                     status = "🔴 Таймаут"
-                except Exception:
+                except ValueError as e:
+                    print(e)
                     status = "🔴 Недоступен"
 
                 lines.append(f"{name}\n{status}")

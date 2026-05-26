@@ -11,11 +11,8 @@ def handler_errors(bot):
                 print(f"HANDLER ERROR [{func.__name__}]:", e)
 
                 try:
-                    bot.answer_callback_query(
-                        call.id,
-                        "❌ Ошибка"
-                    )
-                except:
+                    bot.answer_callback_query(call.id, "❌ Ошибка")
+                except ValueError:
                     pass
 
         return wrapper
