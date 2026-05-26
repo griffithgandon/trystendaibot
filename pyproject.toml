@@ -1,0 +1,20 @@
+[project]
+name = "trystendai-bot"
+version = "0.24.0"
+readme = "README.md"
+requires-python = ">=3.14"
+
+dependencies = [
+    "pytelegrambotapi>=4.33.0",
+    "python-dotenv>=1.2.2",
+    "requests>=2.34.2",
+    "django-qrcode>=0.3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "ruff>=0.15.14",
+    "mypy>=2.1.0",
+    "black>=26.5.1",
+]

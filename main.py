@@ -13,6 +13,7 @@ bot = telebot.TeleBot(BOT_TOKEN)
 register_handlers(bot)
 register_admin_handlers(bot)
 
+
 def sub_loop():
 
     while True:
@@ -26,20 +27,13 @@ def sub_loop():
         time.sleep(3600)
 
 
-threading.Thread(
-    target=sub_loop,
-    daemon=True
-).start()
+threading.Thread(target=sub_loop, daemon=True).start()
 
 while True:
     try:
         print("BOT STARTED")
 
-        bot.infinity_polling(
-            timeout=20,
-            long_polling_timeout=20,
-            skip_pending=True
-        )
+        bot.infinity_polling(timeout=20, long_polling_timeout=20, skip_pending=True)
 
     except Exception as e:
         print("CRASH:", e)

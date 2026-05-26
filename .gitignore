@@ -1,8 +1,10 @@
 .venv/
 __pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .idea/
 *.pyc
 .env
 bot.db
 .png
-fix_db.py

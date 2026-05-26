@@ -18,7 +18,7 @@ def check_subscriptions(bot):
             bot.send_message(
                 user_id,
                 f"⭐ Подписка закончится через ~{hours_left} ч.\n\n"
-                "💎 Продли VPN заранее, чтобы не потерять доступ."
+                "💎 Продли VPN заранее, чтобы не потерять доступ.",
             )
 
             mark_reminded(user_id)
@@ -48,7 +48,7 @@ def check_subscriptions(bot):
             bot.send_message(
                 user_id,
                 "❌ Подписка закончилась — VPN отключён.\n\n"
-                "💎 Чтобы снова получить доступ, продли VPN."
+                "💎 Чтобы снова получить доступ, продли VPN.",
             )
         except Exception as e:
             print(f"EXPIRED NOTIFY ERROR user={user_id}:", e)

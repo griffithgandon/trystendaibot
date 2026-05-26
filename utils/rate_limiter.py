@@ -87,16 +87,15 @@ def rate_limit(bot, call_or_message, limiter: RateLimiter | None = None):
 
     # Тихо игнорируем либо отвечаем — зависит от типа объекта
     try:
-        if hasattr(call_or_message, "id"):          # CallbackQuery
+        if hasattr(call_or_message, "id"):  # CallbackQuery
             bot.answer_callback_query(
                 call_or_message.id,
                 "⏳ Слишком много запросов. Подождите немного.",
-                show_alert=True
+                show_alert=True,
             )
-        else:                                        # Message
+        else:  # Message
             bot.send_message(
-                call_or_message.chat.id,
-                "⏳ Слишком много запросов. Подождите немного."
+                call_or_message.chat.id, "⏳ Слишком много запросов. Подождите немного."
             )
     except Exception:
         pass

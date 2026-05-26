@@ -1,19 +1,5 @@
 # Telegram VPN Bot
 
-Telegram VPN bot with:
-
-- VPN subscription management
-- Admin panel
-- Payment requests
-- User support system
-- Subscription management
-- QR-code VPN access
-- Broadcast system
-- Statistics
-- SQLite database
-
-# Features
-
 ## User Features
 
 - User profile
@@ -85,13 +71,7 @@ HYSTERIA_ENABLED=true
 # ВАЖНО — без / в конце
 SUB_BASE_URL=https://domain.com:port/sub_url
 
-PORT=443
-
 API_TOKEN=token - Апи токен панели.
-
-# ===== ПРОТОКОЛЫ =====
-VLESS_INBOUND_IDS=
-HYSTERIA_INBOUND_ID=
 
 # ===== PAYMENT =====
 SBP_NUMBER=+79999999999
@@ -120,7 +100,7 @@ SERVER1_URL=
 SERVER2_NAME=
 SERVER2_URL=
 ```
-## Run bot
+## Запуск бота
 
 ```bash
 python main.py
