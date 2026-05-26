@@ -45,7 +45,6 @@ HYSTERIA_INBOUND_ID = int(os.getenv("HYSTERIA_INBOUND_ID", "0"))
 # ===== SUB =====
 SUB_BASE_URL = os.getenv("SUB_BASE_URL", "")
 DOMAIN = os.getenv("DOMAIN", "")
-PORT = get_int("PORT", 443)
 
 
 # ===== HYSTERIA =====
