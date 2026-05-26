@@ -17,9 +17,6 @@ jobs:
       - name: Sync dependencies
         run: uv sync
 
-      - name: Show files
-        run: find .
-
       - name: Ruff
         run: uv run ruff check .
 
