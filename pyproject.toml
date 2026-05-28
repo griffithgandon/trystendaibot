@@ -8,7 +8,7 @@ dependencies = [
     "pytelegrambotapi>=4.33.0",
     "python-dotenv>=1.2.2",
     "requests>=2.34.2",
-    "django-qrcode>=0.3",
+    "qrcode[pil]>=7.0",
 ]
 
 [dependency-groups]
