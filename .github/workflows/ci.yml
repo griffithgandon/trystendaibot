@@ -21,7 +21,7 @@ jobs:
         run: uv run ruff check .
 
       - name: Black
-        run: uv run black --check .
+        run: uv run black --check --target-version py314 .
 
       - name: Tests
         run: uv run pytest
