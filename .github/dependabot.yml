@@ -19,10 +19,6 @@ updates:
     commit-message:
       prefix: "deps"
 
-    reviewers:
-      - Crypt0png
-      - blessedbyb
-
     ignore:
       - dependency-name: "pytelegrambotapi"
         update-types: [ "version-update:semver-major" ]
