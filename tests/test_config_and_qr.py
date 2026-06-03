@@ -4,7 +4,7 @@
 
 import sys
 import os
-import io
+# import io
 import pytest
 
 # Хелперы из config.py (тестируется изолированно, без загрузки всего конфига)
