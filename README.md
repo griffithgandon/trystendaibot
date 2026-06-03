@@ -22,7 +22,7 @@
 - User statistics
 - Telegram username display
 
-# Tech Stack
+## Tech Stack
 
 - Python
 - pyTelegramBotAPI
