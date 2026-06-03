@@ -8,13 +8,13 @@ dependencies = [
     "pytelegrambotapi>=4.33.0",
     "python-dotenv>=1.2.2",
     "requests>=2.34.2",
-    "qrcode[pil]>=7.0",
+    "django-qrcode>=0.3",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",
-    "ruff==0.15.15",
+    "ruff>=0.15.15",
     "mypy>=2.1.0",
     "black>=26.5.1",
 ]
