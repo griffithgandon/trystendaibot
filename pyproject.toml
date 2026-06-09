@@ -5,7 +5,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 
 dependencies = [
-    "pytelegrambotapi>=4.33.0",
+    "pytelegrambotapi>=4.34.0",
     "python-dotenv>=1.2.2",
     "requests>=2.34.2",
     "django-qrcode>=0.3",
