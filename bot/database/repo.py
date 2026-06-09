@@ -1,7 +1,8 @@
 import time
-import aiosqlite
-from bot.database.db import get_db
 
+import aiosqlite
+
+from bot.database.db import get_db
 
 # ===== Users =====
 
@@ -195,7 +196,7 @@ async def get_pending_payments() -> list[aiosqlite.Row]:
         ORDER BY created_at DESC
         """
     ) as cursor:
-        return await cursor.fetchall()
+        return list(await cursor.fetchall())
 
 
 async def get_pending_trials() -> list[aiosqlite.Row]:
@@ -208,7 +209,7 @@ async def get_pending_trials() -> list[aiosqlite.Row]:
         ORDER BY created_at DESC
         """
     ) as cursor:
-        return await cursor.fetchall()
+        return list(await cursor.fetchall())
 
 
 # ===== Reminders =====
@@ -224,7 +225,7 @@ async def get_users_expiring_soon() -> list[aiosqlite.Row]:
         """,
         (now, now + 2 * 86400),
     ) as cursor:
-        return await cursor.fetchall()
+        return list(await cursor.fetchall())
 
 
 async def mark_reminded(user_id: int) -> None:
@@ -242,7 +243,7 @@ async def get_expired_users() -> list[aiosqlite.Row]:
         "SELECT user_id FROM users WHERE sub_until > 0 AND sub_until < ?",
         (int(time.time()),),
     ) as cursor:
-        return await cursor.fetchall()
+        return list(await cursor.fetchall())
 
 
 # ===== Stats =====
@@ -277,7 +278,7 @@ async def get_recent_users(limit: int = 20) -> list[aiosqlite.Row]:
     async with db.execute(
         "SELECT user_id FROM users ORDER BY user_id DESC LIMIT ?", (limit,)
     ) as cursor:
-        return await cursor.fetchall()
+        return list(await cursor.fetchall())
 
 
 async def get_all_user_ids() -> list[int]:

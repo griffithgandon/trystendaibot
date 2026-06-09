@@ -29,3 +29,8 @@ testpaths = ["tests/"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+
+[tool.mypy]
+# Плагин учит mypy, что поля pydantic-settings берутся из .env,
+# иначе Settings() ругается на "missing named argument".
+plugins = ["pydantic.mypy"]
