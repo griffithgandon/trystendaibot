@@ -1,6 +1,8 @@
 from functools import lru_cache
+from typing import Annotated
+
 from pydantic import field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -16,8 +18,10 @@ class Settings(BaseSettings):
     bot_token: str
 
     # ===== Admins =====
-    admin_ids: list[int] = []
-    admin_usernames: list[str] = []
+    # NoDecode: не пытаться json.loads — значения парсит field_validator ниже
+    # (иначе "1,2,3" из .env падает на JSON-декоде в pydantic-settings).
+    admin_ids: Annotated[list[int], NoDecode] = []
+    admin_usernames: Annotated[list[str], NoDecode] = []
 
     # ===== Database =====
     db_path: str = "bot.db"
@@ -28,7 +32,7 @@ class Settings(BaseSettings):
     # ===== 3X-UI Panel =====
     panel_url: str
     api_token: str
-    vless_inbound_ids: list[int] = []
+    vless_inbound_ids: Annotated[list[int], NoDecode] = []
     hysteria_inbound_id: int = 0
     hysteria_enabled: bool = False
     panel_verify: str = "true"  # "true" | "false" | "/path/to/cert"

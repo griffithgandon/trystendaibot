@@ -1,4 +1,5 @@
 import aiosqlite
+
 from bot.config import get_settings
 
 settings = get_settings()
@@ -10,7 +11,9 @@ _db: aiosqlite.Connection | None = None
 async def get_db() -> aiosqlite.Connection:
     global _db
     if _db is None:
-        raise RuntimeError("База данных не инициализирована. Вызови init_db() при старте.")
+        raise RuntimeError(
+            "База данных не инициализирована. Вызови init_db() при старте."
+        )
     return _db
 
 
