@@ -1,5 +1,6 @@
 # Telegram VPN Bot
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://github.com/astral-sh/ruff)
+
 ## User Features
 
 - User profile
@@ -9,6 +10,7 @@
 - VPN config retrieval
 - QR-code generation
 - Built-in support chat
+- Trial subscriptions
 
 ## Admin Features
 
@@ -24,10 +26,13 @@
 
 ## Tech Stack
 
-- Python
-- pyTelegramBotAPI
-- SQLite
-- 3X-UI API
+- Python 3.14+
+- [aiogram 3](https://docs.aiogram.dev/) (async)
+- SQLite (aiosqlite)
+- pydantic-settings (конфигурация)
+- APScheduler (фоновые задачи)
+- [uv](https://docs.astral.sh/uv/) (управление зависимостями)
+- 3X-UI API (VLESS + Hysteria2)
 
 # Установка
 
@@ -35,104 +40,91 @@
 
 ```bash
 git clone https://github.com/griffithgandon/trystendaibot
-cd REPOSITORY
+cd trystendaibot
 ```
 
 ## Установить зависимости
 
 ```bash
-pip install -r requirements.txt
+uv sync
 ```
 
-## Настройка конфигурационного файла
+## Конфигурация (.env)
 
-Настройка конфига производится в `config.py`
+Вся конфигурация задаётся через переменные окружения в файле `.env`
+(файла нет в репозитории — секреты). Скопируй шаблон и заполни:
 
-## Конфигурация секретов в .env
+```bash
+cp .env.example .env
+```
 
-Без секретов бот работать не будет. Этого файла нет в репозитории по понятным причинам, из за чего требуется вручную создать его и настроить по примеру снизу.
+Минимально необходимые переменные:
+
 ```text
-BOT_TOKEN = "BOT_TOKEN" - токен бота из BotFather, с кавычками
-
-ADMIN_ID=000000,000000 - телеграм ID администраторов
-
-DB_PATH=database/bot.db - путь к базе данных. На данный момент можно не трогать
-
-PANEL_URL=https://domain.com:port/panel_url - полный url к панели
-
-DOMAIN=domain.com - ваш домен, при наличии такового
-
-ADMIN_USERNAMES=Null - Юзернеймы администраторов из телеграма через запятую
-
-PANEL_VERIFY=true
-
-HYSTERIA_ENABLED=true
-
-# ВАЖНО — без / в конце
-SUB_BASE_URL=https://domain.com:port/sub_url
-
-API_TOKEN=token - Апи токен панели.
-
-# ===== PAYMENT =====
-SBP_NUMBER=+79999999999
-CARD_NUMBER=2200000000000000
-
-# тарифы
-TARIFF_1_TITLE=30 дней
-TARIFF_1_PRICE=150
-TARIFF_1_DAYS=30
-
-TARIFF_2_TITLE=90 дней
-TARIFF_2_PRICE=450
-TARIFF_2_DAYS=90
-
-TARIFF_3_TITLE=180 дней
-TARIFF_3_PRICE=900
-TARIFF_3_DAYS=180
-
-TARIFF_4_TITLE=360 дней
-TARIFF_4_PRICE=1500
-TARIFF_4_DAYS=365
-
-SERVER1_NAME=
-SERVER1_URL=
-
-SERVER2_NAME=
-SERVER2_URL=
+BOT_TOKEN=...        # токен бота из @BotFather
+ADMIN_IDS=1,2        # Telegram ID администраторов через запятую
+PANEL_URL=...        # полный URL панели 3X-UI (с webBasePath, без слэша в конце)
+API_TOKEN=...        # Bearer-токен панели: Settings -> API
+SUB_BASE_URL=...     # базовый URL подписки (без слэша в конце)
 ```
+
+Остальное (платёжные реквизиты, пробный период, серверы статуса) — см.
+комментарии в [.env.example](.env.example).
+
+**Inbound ID определяются автоматически**: бот запрашивает
+`/panel/api/inbounds/list` и находит VLESS/Hysteria2-инбаунды по протоколу.
+`VLESS_INBOUND_IDS` / `HYSTERIA_INBOUND_ID` в `.env` нужны только если
+хочешь ограничить выдачу конкретными инбаундами.
+
+Тарифы заданы в `bot/config.py` (свойство `Settings.tariffs`).
+
 ## Запуск бота
 
 ```bash
-python main.py
+uv run python main.py
+```
+
+## Тесты и линтеры
+
+```bash
+uv run pytest          # тесты (без сети и реальной панели)
+uv run ruff check .    # линтер
+uv run mypy bot/       # типы
 ```
 
 # База данных
 
-Бот автоматически создает следующие таблицы:
+SQLite, создаётся автоматически при первом запуске. Таблицы:
 - users
 - pending_payments
 
 # Структура проекта
 
 ```text
-database/
-    db.py
-    
-handlers/
-    admin_handlers.py
-    user_handlers.py
+bot/
+    config.py            # Settings (pydantic-settings, .env)
+    states.py            # FSM-состояния
+    scheduler.py         # APScheduler (проверка подписок раз в час)
+    database/
+        db.py            # соединение и миграции (aiosqlite)
+        repo.py          # запросы к БД
+    handlers/
+        user.py          # пользовательский роутер
+        admin.py         # админский роутер (фильтр IsAdmin)
+    keyboards/
+        user.py
+        admin.py
+    middlewares/
+        throttling.py    # анти-флуд (rate limit)
+        error_handler.py # глобальный обработчик ошибок
+    services/
+        vpn.py           # 3X-UI API (async, автодискавери инбаундов)
+        sub_checker.py   # напоминания и отключение истёкших подписок
+    utils/
+        qr.py            # QR-коды конфигов
 
-services/
-    sub_checker.py
-    vpn.py
-    
-utils/
-    error_handler.py
-    qr.py
-    rate_limiter.py
-    
-config.py
-main.py
+main.py                  # точка входа (Bot, Dispatcher, polling)
+tests/                   # pytest + pytest-asyncio
 ```
 
 # Потенциальное развитие проекта
