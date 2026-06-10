@@ -91,6 +91,57 @@ async def get_inbounds() -> dict | None:
         return None
 
 
+# ===== INBOUND DISCOVERY =====
+
+def _discover_ids(data: dict) -> tuple[list[int], int]:
+    """Извлекает (vless_ids, hysteria_id) из ответа /inbounds/list."""
+    vless_ids: list[int] = []
+    hysteria_id = 0
+
+    for inbound in data.get("obj", []):
+        protocol = inbound.get("protocol", "").lower()
+        inbound_id = inbound.get("id")
+        if inbound_id is None:
+            continue
+        if protocol == "vless":
+            vless_ids.append(inbound_id)
+        elif protocol in ("hysteria2", "hysteria") and not hysteria_id:
+            hysteria_id = inbound_id
+
+    return vless_ids, hysteria_id
+
+
+async def resolve_inbound_ids() -> tuple[list[int], int]:
+    """
+    Возвращает (vless_inbound_ids, hysteria_inbound_id).
+
+    Значения из .env имеют приоритет (ручной override); чего не хватает —
+    автоматически определяется с панели по протоколу инбаунда.
+    """
+    vless_ids = settings.vless_inbound_ids
+    hysteria_id = settings.hysteria_inbound_id
+
+    need_hysteria = settings.hysteria_enabled and not hysteria_id
+    if vless_ids and not need_hysteria:
+        return vless_ids, hysteria_id
+
+    data = await get_inbounds()
+    if not data:
+        logger.error("DISCOVERY: панель недоступна, использую значения из .env")
+        return vless_ids, hysteria_id
+
+    found_vless, found_hysteria = _discover_ids(data)
+    if not vless_ids:
+        vless_ids = found_vless
+        logger.info("DISCOVERY: VLESS inbound ids с панели: %s", vless_ids)
+    if not hysteria_id:
+        hysteria_id = found_hysteria
+        if settings.hysteria_enabled:
+            logger.info("DISCOVERY: Hysteria inbound id с панели: %s", hysteria_id)
+
+    return vless_ids, hysteria_id
+
+
 # ===== CREATE USER =====
 
 async def create_user(user_id: int, days: int) -> bool:
@@ -102,11 +153,17 @@ async def create_user(user_id: int, days: int) -> bool:
     sub_id = str(uuid4()).replace("-", "")[:16]
     success = False
 
+    vless_ids, hy_id = await resolve_inbound_ids()
+    if not vless_ids:
+        logger.error(
+            "CREATE USER %s: нет VLESS-инбаундов (ни в .env, ни на панели)", user_id
+        )
+
     async with _new_session() as session:
         # ===== VLESS =====
         vless_uuid = str(uuid4())
 
-        for inbound_id in settings.vless_inbound_ids:
+        for inbound_id in vless_ids:
             vless_client = {
                 "id": vless_uuid,
                 "flow": "xtls-rprx-vision",
@@ -137,8 +194,12 @@ async def create_user(user_id: int, days: int) -> bool:
                 logger.error("VLESS [%s] ERROR: %s", inbound_id, e)
 
         # ===== HYSTERIA2 =====
-        if settings.hysteria_enabled:
-            hy_id = settings.hysteria_inbound_id
+        if settings.hysteria_enabled and not hy_id:
+            logger.error(
+                "HYSTERIA SKIP: включена, но inbound не найден "
+                "(ни в .env, ни на панели)"
+            )
+        elif settings.hysteria_enabled:
             try:
                 status, data, text = await _request(
                     session,

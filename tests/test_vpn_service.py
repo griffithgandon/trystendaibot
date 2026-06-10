@@ -64,6 +64,78 @@ def _clients_from(payload: dict) -> list:
     return json.loads(payload.get("json", {}).get("settings", "{}")).get("clients", [])
 
 
+# ===== inbound discovery =====
+
+class TestDiscoverIds:
+    def test_filters_vless_and_first_hysteria(self):
+        data = {
+            "obj": [
+                {"id": 1, "protocol": "vless"},
+                {"id": 2, "protocol": "vmess"},
+                {"id": 3, "protocol": "vless"},
+                {"id": 4, "protocol": "hysteria2"},
+                {"id": 5, "protocol": "hysteria2"},
+            ]
+        }
+        vless, hy = vpn._discover_ids(data)
+        assert vless == [1, 3]
+        assert hy == 4  # первый hysteria-инбаунд
+
+    def test_empty_panel(self):
+        assert vpn._discover_ids({"obj": []}) == ([], 0)
+
+    def test_skips_inbounds_without_id(self):
+        data = {"obj": [{"protocol": "vless"}, {"id": 7, "protocol": "vless"}]}
+        assert vpn._discover_ids(data) == ([7], 0)
+
+
+class TestResolveInboundIds:
+    async def test_env_override_skips_network(self, monkeypatch):
+        # conftest: VLESS_INBOUND_IDS=1,2; hysteria выключена -> сеть не нужна
+        async def boom(*a, **kw):
+            raise AssertionError("сеть не должна вызываться при override")
+
+        monkeypatch.setattr(vpn, "get_inbounds", boom)
+        assert await vpn.resolve_inbound_ids() == ([1, 2], 3)
+
+    async def test_discovers_when_env_empty(self, monkeypatch):
+        monkeypatch.setattr(vpn.settings, "vless_inbound_ids", [])
+        monkeypatch.setattr(vpn.settings, "hysteria_inbound_id", 0)
+        inbounds = [
+            {"id": 11, "protocol": "vless"},
+            {"id": 12, "protocol": "hysteria2"},
+        ]
+        with patch.object(vpn, "_request", new=_fake_request(inbounds)):
+            vless, hy = await vpn.resolve_inbound_ids()
+        assert vless == [11]
+        assert hy == 12
+
+    async def test_panel_down_falls_back_to_env(self, monkeypatch):
+        monkeypatch.setattr(vpn.settings, "vless_inbound_ids", [])
+
+        async def fail(session, method, url, json_data=None):
+            return (500, {"success": False}, "")
+
+        with patch.object(vpn, "_request", new=fail):
+            vless, hy = await vpn.resolve_inbound_ids()
+        assert vless == []  # как в .env — пусто
+
+    async def test_create_user_uses_discovered_inbounds(self, monkeypatch):
+        monkeypatch.setattr(vpn.settings, "vless_inbound_ids", [])
+        inbounds = [
+            {"id": 21, "protocol": "vless", "settings": "{}"},
+            {"id": 22, "protocol": "vless", "settings": "{}"},
+        ]
+        cap: list = []
+        with (
+            patch.object(vpn, "_request", new=_fake_request(inbounds, capture=cap)),
+            patch.object(vpn, "get_username", new=AsyncMock(return_value="t")),
+        ):
+            assert await vpn.create_user(500, 30) is True
+        add = [c for c in cap if c["url"].endswith("/addClient")]
+        assert {c["json"]["id"] for c in add} == {21, 22}
+
+
 # ===== get_vpn_data =====
 
 class TestGetVpnData:
